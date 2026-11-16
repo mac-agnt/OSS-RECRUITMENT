@@ -7,7 +7,7 @@ export default function HomeThread({ v }: Props) {
   return (
     <>
       <div style={css(v.threadWidthStyle)}>
-        <div style={{"display":"flex","alignItems":"flex-start","gap":"20px","paddingBottom":"22px"}}>
+        <div data-thread-head="1" style={{"display":"flex","alignItems":"flex-start","gap":"20px","paddingBottom":"22px"}}>
           <div style={{"flex":"1","minWidth":"0","paddingTop":"2px"}}>
             <div style={{"fontFamily":"var(--mono)","fontSize":"10.5px","letterSpacing":"0.12em","color":"var(--faint)"}}>
               {"CONVERSATION"}
@@ -114,7 +114,7 @@ export default function HomeThread({ v }: Props) {
                       </div>
                       {m?.hasTable && (
                         <>
-                          <div style={{"marginTop":"16px","background":"var(--surface)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(16px)","overflow":"hidden"}}>
+                          <div data-answer-table="1" style={{"marginTop":"16px","background":"var(--surface)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(16px)","overflow":"hidden"}}>
                             <div style={css(cat("display:grid;grid-template-columns:", m?.tableCols, ";background:var(--surface)"))}>
                               {arr(m?.cols).map((c: any, i9: number) => (
                                 <Fragment key={i9}>

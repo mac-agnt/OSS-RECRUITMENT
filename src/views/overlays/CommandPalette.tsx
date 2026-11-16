@@ -60,7 +60,7 @@ export default function CommandPalette({ v }: Props) {
                       {txt(v.palPageLabel)}
                     </span>
                   </div>
-                  <div style={{"display":"grid","gridTemplateColumns":"1fr 1fr","gap":"8px","padding":"0 18px 4px"}}>
+                  <div style={{"display":"grid","gridTemplateColumns":"repeat(2,minmax(0,1fr))","gap":"8px","padding":"0 18px 4px"}}>
                     {arr(v.palPage).map((p: any, i155: number) => (
                       <Fragment key={i155}>
                         <button onClick={p?.open} onMouseEnter={p?.hover} style={css(p?.style)}>

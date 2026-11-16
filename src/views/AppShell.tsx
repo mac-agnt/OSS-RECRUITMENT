@@ -1,13 +1,13 @@
 import { Fragment } from "react";
 import { arr, cat, css, cx, txt } from "../runtime/template";
 import AgentFace from "../components/AgentFace";
-import NavThumb from "../components/NavThumb";
+import NavThumb, { KeepActiveTabInView } from "../components/NavThumb";
 import DashboardKpiBand from "./pages/DashboardKpiBand";
 import Home from "./pages/Home";
 import Records from "./pages/Records";
 import RecordsFiles from "./pages/RecordsFiles";
 import RecordsOntology from "./pages/RecordsOntology";
-import { HeaderControls, OntologyLineage, OssOverlays, OssPage, PersonaCard, PhoneDock, RecordsExtra } from "../oss/ui/Shell";
+import { BottomBar, HeaderControls, OntologyLineage, OssOverlays, OssPage, PersonaCard, PhoneDock, RecordsExtra } from "../oss/ui/Shell";
 import HeliosMini from "./overlays/HeliosMini";
 import WorkViewer from "./overlays/WorkViewer";
 import AgentStudio from "./overlays/AgentStudio";
@@ -20,11 +20,12 @@ type Props = { v: any };
 export default function AppShell({ v }: Props) {
   return (
     <>
-    <div data-theme={v.theme} style={{"fontFamily":"var(--ui)","position":"relative","display":"flex","height":"100vh","overflow":"hidden","background":"var(--bg)","color":"var(--ink)",...v.rootVars}}>
+    <div data-theme={v.theme} style={{"fontFamily":"var(--ui)","position":"relative","display":"flex","height":"100dvh","overflow":"hidden","background":"var(--bg)","color":"var(--ink)",...v.rootVars}}>
       <div style={{"position":"absolute","width":"1px","height":"1px","overflow":"hidden","opacity":"0","pointerEvents":"none"}}>
         <AgentFace shape={"crown-pebble"} state={"idle"} tint={"#191c1f"} size={"1"} />
       </div>
-      <nav data-rail-nav="1" style={css(v.railOuter)}>
+      {v.navDrawer && <div onClick={v.closeDrawer} aria-hidden="true" style={{"position":"fixed","inset":"0","zIndex":"95","background":"var(--scrim)","backdropFilter":"blur(4px)","animation":"notifScrim .3s var(--ease) both"}} />}
+      <nav data-rail-nav="1" aria-label="Main" style={css(v.railOuter)}>
         <span style={css(v.railThumbStyle)} />
         <div style={css(cat(v.railRowStyle, "margin-bottom:22px"))}>
           <button className={cx("ix0", "ix1")} onClick={v.toggleRail} title={v.railLabel} style={{"width":"36px","height":"36px","flex":"none","border":"0","borderRadius":"var(--cta-r,11px)","background":"#064B68","color":"#ffffff","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","fontSize":"10.5px","fontWeight":"700","letterSpacing":".04em","padding":"0","transition":"transform .2s var(--ease)","overflow":"hidden"}}>
@@ -43,7 +44,7 @@ export default function AppShell({ v }: Props) {
             <>
               <button className="ix2" onClick={v.toggleRail} title={v.railLabel} style={{"width":"28px","height":"28px","flex":"none","border":"0","borderRadius":"var(--r-ctl,10px)","background":"none","color":"var(--mid)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"background .2s var(--ease),color .2s var(--ease)"}}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 6h16 M4 12h10 M4 18h16" />
+                  <path d={v.isMobile ? "M6 6l12 12 M18 6 6 18" : "M4 6h16 M4 12h10 M4 18h16"} />
                 </svg>
               </button>
             </>
@@ -53,7 +54,8 @@ export default function AppShell({ v }: Props) {
           <Fragment key={i0}>
             {item?.isDivider && (
               <>
-                <div style={{"width":"20px","height":"1px","background":"var(--track)","margin":"7px 0"}} />
+                <div style={css(item?.lineStyle)} />
+                {item?.hasLabel && <div className="oss-railsec">{txt(item?.label)}</div>}
               </>
             )}
             {item?.isItem && (
@@ -89,7 +91,7 @@ export default function AppShell({ v }: Props) {
           <>
             <div style={{"margin":"6px 4px 4px","padding":"18px 18px 16px","background":"var(--surface)","border":"1px solid var(--border)","borderRadius":"18px"}}>
               <div style={{"fontSize":"11px","fontWeight":"600","letterSpacing":".12em","color":"var(--faint)"}}>
-                {"ACTING AS (DEMO)"}
+                {"SIGNED IN"}
               </div>
               <div style={{"display":"flex","alignItems":"center","gap":"11px","marginTop":"12px"}}>
                 <PersonaCard compact />
@@ -143,7 +145,7 @@ export default function AppShell({ v }: Props) {
           {txt(v.hoverLabel?.hint)}
         </span>
       </span>
-      <main style={css(cat("--page-dy:", v.pageDy, ";position:relative;z-index:1;flex:1;min-width:0;display:flex;flex-direction:column;margin:16px 16px 16px 0;background:var(--panel,#0f1316);border:1px solid var(--border);border-radius:28px;overflow:hidden;box-shadow:0 1px 0 rgba(255,255,255,.03) inset"))}>
+      <main data-shell-main="1" style={css(cat("--page-dy:", v.pageDy, ";position:relative;z-index:1;flex:1;min-width:0;display:flex;flex-direction:column;", v.isMobile ? "margin:0;border:0;border-radius:0;" : "margin:16px 16px 16px 0;border:1px solid var(--border);border-radius:28px;", "background:var(--panel,#0f1316);overflow:hidden;box-shadow:0 1px 0 rgba(255,255,255,.03) inset"))}>
         {"\n"}
         {txt(v.pageSweepEl)}
         {"\n"}
@@ -154,8 +156,15 @@ export default function AppShell({ v }: Props) {
         )}
         <div style={{"position":"absolute","left":"0","right":"0","bottom":"0","height":"64px","zIndex":"3","pointerEvents":"none","maskImage":"linear-gradient(0deg,#000 0%,transparent 100%)","WebkitMaskImage":"linear-gradient(0deg,#000 0%,transparent 100%)","background":"linear-gradient(0deg,var(--bg) 0%,rgba(0,0,0,0) 100%)","opacity":".85"}} />
         <div style={css(v.headerFieldStyle)} />
-        <header style={{"position":"relative","zIndex":"4","flex":"none","width":"100%","padding":"18px 28px","boxSizing":"border-box","borderBottom":"1px solid var(--border)"}}>
-          <div style={css(v.headerPillStyle)}>
+        <header data-shell-header="1" style={{"position":"relative","zIndex":"4","flex":"none","width":"100%","padding":v.isMobile ? "calc(8px + env(safe-area-inset-top)) 10px 8px" : "18px 28px","boxSizing":"border-box","borderBottom":"1px solid var(--border)","display":v.isMobile ? "flex" : "block","alignItems":"center","gap":"8px"}}>
+          {v.isMobile && (
+            <button className="ix2" onClick={v.openDrawer} aria-label="Open menu" aria-expanded={!!v.navDrawer} style={{"flex":"none","width":"44px","height":"44px","border":"1px solid var(--border)","borderRadius":"999px","background":"var(--surface)","color":"var(--ink)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","padding":"0"}}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 6h16 M4 12h16 M4 18h16" />
+              </svg>
+            </button>
+          )}
+          <div style={css(cat(v.headerPillStyle, v.isMobile ? ";flex:1 1 auto;width:auto;margin:0;height:46px;padding:2px;" : ""))}>
             {v.isAgents && (
               <>
                 <div style={{"flex":"0 0 auto","display":"flex","alignItems":"center","gap":"9px","padding":"0 8px 0 5px"}}>
@@ -179,12 +188,13 @@ export default function AppShell({ v }: Props) {
             )}
             {v.showPillNav && (
               <>
-                <div style={css(v.navGroupStyle)}>
+                <div style={css(cat(v.navGroupStyle, v.isMobile ? ";flex:0 1 auto;min-width:0" : ""))}>
                   {v.tabsLoose && (
                     <>
                       <NavThumb style={v.navThumb} tabsKey={v.navThumbKey} />
                     </>
                   )}
+                  {!v.tabsLoose && <KeepActiveTabInView tabsKey={v.navThumbKey} />}
                   {arr(v.contextNav).map((t: any, i1: number) => (
                     <Fragment key={i1}>
                       {t?.active && (
@@ -246,7 +256,7 @@ export default function AppShell({ v }: Props) {
             )}
             {v.barOpen && (
               <>
-                <div style={{"width":"1px","height":"18px","flex":"none","margin":"0 4px","background":"var(--border)"}} />
+                {!v.isMobile && <div style={{"width":"1px","height":"18px","flex":"none","margin":"0 4px","background":"var(--border)"}} />}
                 <div style={{"flex":"0 0 auto","display":"flex","alignItems":"center","gap":"2px","padding":"0 3px"}}>
                   {v.showTheme && (
                     <>
@@ -272,21 +282,21 @@ export default function AppShell({ v }: Props) {
                     <span style={{"position":"absolute","top":"9px","right":"10px","width":"8px","height":"8px","borderRadius":"999px","background":"var(--warn)","boxShadow":"0 0 0 2px var(--surface-2)"}} />
                   </button>
                 </div>
-                <div style={{"width":"1px","height":"18px","flex":"none","margin":"0 4px","background":"var(--border)"}} />
-                <HeaderControls />
+                {!v.isMobile && <div style={{"width":"1px","height":"18px","flex":"none","margin":"0 4px","background":"var(--border)"}} />}
+                {!v.isMobile && <HeaderControls />}
               </>
             )}
-            <button className="ix2" onClick={v.toggleBar} title={v.barLabel} style={{"flex":"none","width":"42px","height":"42px","border":"0","borderRadius":"999px","background":"none","color":"var(--faint)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"background .2s var(--ease),color .2s var(--ease)"}}>
+            {!v.isMobile && <button className="ix2" onClick={v.toggleBar} title={v.barLabel} style={{"flex":"none","width":"42px","height":"42px","border":"0","borderRadius":"999px","background":"none","color":"var(--faint)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"background .2s var(--ease),color .2s var(--ease)"}}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={css(v.barChevronStyle)}>
                 <path d="m9 6 6 6-6 6" />
               </svg>
-            </button>
+            </button>}
           </div>
         </header>
         {v.showNotifs && (
           <>
             <div onClick={v.closeNotifs} style={{"position":"fixed","inset":"0","zIndex":"58","background":"rgba(0,0,0,.28)","backdropFilter":"blur(3px)","animation":"notifScrim .4s var(--ease) both"}} />
-            <div style={{"position":"fixed","top":"60px","right":"22px","zIndex":"59","width":"min(390px,88vw)","transformOrigin":"calc(100% - 26px) -6px","animation":"notifPanel .58s cubic-bezier(.16,1,.28,1) both"}}>
+            <div style={{"position":"fixed","top":v.isMobile ? "64px" : "60px","right":v.isMobile ? "10px" : "22px","zIndex":"59","width":v.isMobile ? "calc(100vw - 20px)" : "min(390px,88vw)","transformOrigin":"calc(100% - 26px) -6px","animation":"notifPanel .58s cubic-bezier(.16,1,.28,1) both"}}>
               <span style={{"position":"absolute","top":"-34px","right":"6px","width":"180px","height":"120px","pointerEvents":"none","background":"radial-gradient(closest-side,var(--accent-soft),transparent 72%)","opacity":".9","animation":"notifHalo .7s var(--ease) both"}} />
               <div style={{"position":"relative","padding":"10px","background":"var(--overlay)","border":"1px solid var(--border-strong)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(44px) saturate(1.5)","boxShadow":"0 34px 90px rgba(0,0,0,.6),inset 0 1px 0 var(--glass-highlight)","overflow":"hidden"}}>
                 <span style={{"position":"absolute","inset":"0","pointerEvents":"none","background":"linear-gradient(180deg,rgba(255,255,255,.05),transparent 42%)"}} />
@@ -338,8 +348,10 @@ export default function AppShell({ v }: Props) {
             </div>
           </>
         )}
-        {v.isDashboard && <DashboardKpiBand v={v} />}
+        {v.isDashboard && v.showKpiBand !== false && !v.isMobile && <DashboardKpiBand v={v} />}
         <div data-scroll-main="1" style={{"flex":"1","minHeight":"0","overflowY":"auto","overflowX":"hidden","scrollbarWidth":"none"}}>
+          {/* On a phone the KPI band scrolls with the page instead of pinning half the screen. */}
+          {v.isDashboard && v.showKpiBand !== false && v.isMobile && <DashboardKpiBand v={v} />}
           {v.isChat && <Home v={v} />}
           {v.ossPage && <OssPage page={v.ossPage} themes={v.themesList} theme={v.theme} setTheme={v.setThemeId} />}
           {v.isRecords && <Records v={v} />}
@@ -360,7 +372,7 @@ export default function AppShell({ v }: Props) {
                       {txt(v.rec?.tableBadge)}
                     </span>
                   </div>
-                  <div style={{"display":"grid","gridTemplateColumns":"1.5fr 1.2fr 1.3fr .9fr .8fr","borderTop":"1px solid var(--border)","background":"var(--surface-faint)"}}>
+                  <div data-contacts-grid="1" style={{"display":"grid","gridTemplateColumns":"1.5fr 1.2fr 1.3fr .9fr .8fr","borderTop":"1px solid var(--border)","background":"var(--surface-faint)"}}>
                     {arr(v.rec?.contactCols).map((c: any, i49: number) => (
                       <Fragment key={i49}>
                         <div style={{"padding":"10px 24px","fontSize":"11.5px","fontWeight":"500","color":"var(--faint)"}}>
@@ -371,7 +383,7 @@ export default function AppShell({ v }: Props) {
                   </div>
                   {arr(v.rec?.contacts).map((p: any, i50: number) => (
                     <Fragment key={i50}>
-                      <div className="ix11" onClick={p?.open} style={{"display":"grid","gridTemplateColumns":"1.5fr 1.2fr 1.3fr .9fr .8fr","borderTop":"1px solid var(--border)","cursor":"pointer","transition":"background .2s var(--ease)"}}>
+                      <div className="ix11" data-contacts-grid="1" onClick={p?.open} style={{"display":"grid","gridTemplateColumns":"1.5fr 1.2fr 1.3fr .9fr .8fr","borderTop":"1px solid var(--border)","cursor":"pointer","transition":"background .2s var(--ease)"}}>
                         <div style={{"display":"flex","alignItems":"center","gap":"11px","padding":"13px 24px","minWidth":"0"}}>
                           <span style={css(cat("width:28px;height:28px;flex:none;border-radius:var(--r-sm,10px);background:", p?.bg, ";color:#0b0c0b;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600"))}>
                             {txt(p?.initials)}
@@ -404,7 +416,7 @@ export default function AppShell({ v }: Props) {
                           {"No contacts match"}
                         </div>
                         <div style={{"fontSize":"13px","color":"var(--dim)","marginTop":"6px"}}>
-                          {"Try fewer words — it matches on name, role, organisation and tag."}
+                          {"Try fewer words: it matches on name, role, organisation and tag."}
                         </div>
                       </div>
                     </>
@@ -529,11 +541,12 @@ export default function AppShell({ v }: Props) {
             </>
           )}
         </div>
+        <BottomBar />
       </main>
       <PhoneDock />
       {v.showFab && (
         <>
-          <button className={cx("ix18", "ixo")} onClick={v.toggleMini} title={v.fabTitle} style={{"position":"fixed","right":"26px","bottom":"26px","zIndex":"47","width":"56px","height":"56px","border":"1px solid var(--accent-line)","borderRadius":"var(--cta-r,14px)","background":"var(--accent-fill,var(--accent))","color":"var(--on-accent)","boxShadow":"0 14px 34px rgba(0,0,0,.34)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"transform .3s var(--ease),box-shadow .3s var(--ease)"}}>
+          <button className={cx("ix18", "ixo")} onClick={v.toggleMini} title={v.fabTitle} aria-label={v.fabTitle} style={{"position":"fixed","right":v.isMobile ? "14px" : "26px","bottom":v.isMobile ? "calc(64px + env(safe-area-inset-bottom))" : "26px","zIndex":"47","width":v.isMobile ? "50px" : "56px","height":v.isMobile ? "50px" : "56px","border":"1px solid var(--accent-line)","borderRadius":"var(--cta-r,14px)","background":"var(--accent-fill,var(--accent))","color":"var(--on-accent)","boxShadow":"0 14px 34px rgba(0,0,0,.34)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"transform .3s var(--ease),box-shadow .3s var(--ease)"}}>
             <span style={{"position":"relative","width":"24px","height":"24px","flex":"none"}}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={css(v.fabChatStyle)}>
                 <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.9 9.9 0 0 1-4-.8L3 21l1.9-4.9A8.3 8.3 0 0 1 4 11.5 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5Z M8 12h1.6l1.2-2.6 1.6 5 1.4-2.4H16" />
@@ -722,7 +735,7 @@ export default function AppShell({ v }: Props) {
                 <>
                   <div style={{"padding":"8px 24px 4px","animation":"expandIn .3s var(--ease) both"}}>
                     <div style={{"fontFamily":"var(--mono)","fontSize":"9.5px","letterSpacing":"0.13em","color":"var(--faint)","marginTop":"10px"}}>
-                      {"PULSE BUILT THIS — EDIT ANYTHING"}
+                      {"PULSE BUILT THIS · EDIT ANYTHING"}
                     </div>
                     <div style={{"marginTop":"14px"}}>
                       {arr(v.builder?.blocks).map((b: any, i145: number) => (

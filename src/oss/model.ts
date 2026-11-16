@@ -13,16 +13,19 @@ export interface Team { id: ID; name: string; members: ID[]; note: string }
 
 export interface Worker {
   id: ID; name: string; roles: string[]; locality: string; email: string; mobile: string;
-  joined: string; status: "active" | "pending_compliance";
+  joined: string; status: "active" | "pending_compliance"; region?: Region;
   priorShifts: number; priorVenues: string[]; registeredBy?: ID; registeredAt?: string;
 }
 
 export interface Client { id: ID; name: string; provenance: string; fictional: boolean; sector: string }
 export interface ClientContact { id: ID; clientId: ID; name: string; role: string; email: string; phone: string }
 
+export type Region = "Dublin" | "Leinster" | "Munster" | "Connacht" | "Ulster";
+export type EventKind = "Concert" | "Sport" | "Corporate" | "Conference" | "Festival" | "Exhibition";
 export interface Venue {
   id: ID; name: string; area: string; meetingPoint: string; meetingConfirmed: boolean;
   geofenceM: number; supervisorId: ID; qrToken: string; methods: ("gps" | "qr")[];
+  county?: string; region?: Region; lat?: number; lng?: number; capacity?: number;
 }
 
 export type BookingStatus = "confirmed" | "pending" | "cancelled";
@@ -30,6 +33,14 @@ export interface EventBooking {
   id: ID; name: string; clientId: ID; venueId: ID | null; date: string; status: BookingStatus;
   ownerId: ID; approverId: ID; supervisorId: ID; ppe: string[]; brief: string; createdAt: string;
   pendingNote?: string; indicativePositions?: number; historical?: boolean; sample?: boolean;
+  /** What kind of work it is; drives the category colour everywhere. */
+  kind?: EventKind;
+  /** Which OSS desk runs it day to day. The 3Arena story sits on the Dublin events desk. */
+  desk?: string;
+  /** Expected audience, for scale on the live board. */
+  audience?: number;
+  /** Run by another OSS desk; played forward by network.ts, not by the story stages. */
+  network?: boolean;
 }
 
 export interface Shift {
@@ -155,6 +166,19 @@ export interface UiState {
   drawer: { kind: string; id: ID } | null; dirty: boolean;
 }
 
+/* Industry layer: recruitment pipeline, inductions, client sign-off and kit. */
+export type ApplicantStage = "applied" | "screened" | "induction" | "inducted" | "docs" | "active" | "withdrawn";
+export interface Applicant {
+  id: ID; name: string; source: string; appliedAt: string; stage: ApplicantStage; roles: string[]; campaign: string;
+  rtw: string; area: string; inductionId?: ID; docs: { mh: boolean; sp: boolean; rtw: boolean; bank: boolean }; note?: string;
+}
+export interface Induction { id: ID; at: string; place: string; capacity: number; host: ID; kind: string }
+export interface ExtState {
+  applicants: Applicant[]; inductions: Induction[];
+  signoffs: Record<ID, { by: string; at: string; note: string; hours: number }>;
+  kit: Record<ID, Record<string, { out: number; back: number }>>;
+}
+
 export interface OssState {
   seedVersion: string; clock: string; seq: number;
   users: AdminUser[]; teams: Team[]; workers: Worker[]; clients: Client[]; contacts: ClientContact[]; venues: Venue[];
@@ -167,5 +191,6 @@ export interface OssState {
   mappings: IntegrationMapping[]; batches: HandoverBatch[]; items: HandoverItem[];
   audit: AuditEvent[]; programmes: ProgrammePlan[]; rules: Rules; automations: Automation[]; autoRuns: AutomationRun[];
   decisions: Decision[]; openShiftRequests: { id: ID; shiftId: ID; workerId: ID; at: string; status: "requested" | "invited" | "declined" }[];
+  ext: ExtState;
   ui: UiState;
 }

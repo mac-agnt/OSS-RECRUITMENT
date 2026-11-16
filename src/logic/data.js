@@ -33,6 +33,12 @@ const ICONS = {
   tree:"M4.5 6h5 M4.5 12h5 M4.5 18h5 M12.5 6h7 M12.5 12h7 M12.5 18h7",
   graph:"M7 7.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8Z M17.6 10.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8Z M9.4 21.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8Z M8.6 6.4l7.6 2.6 M15.8 11.4l-5.6 5.2",
   bell:"M6 8.5a6 6 0 0 1 12 0c0 6.5 2.6 8.5 2.6 8.5H3.4S6 15 6 8.5Z M10.3 20.5a1.94 1.94 0 0 0 3.4 0",
+  navClients:"M4 20V8.5L12 4l8 4.5V20 M9 20v-5h6v5 M8 10.5h.01 M12 10.5h.01 M16 10.5h.01",
+  navRecruit:"M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z M3.5 20c.8-3.3 3.3-5.2 6.5-5.2 1.2 0 2.3.3 3.2.8 M17.5 14v6 M14.5 17h6",
+  navCompliance:"M12 3.5 19.5 6v6c0 4.2-3.1 7.2-7.5 8.5C7.6 19.2 4.5 16.2 4.5 12V6L12 3.5Z M8.8 12.2l2.2 2.2 4.2-4.4",
+  navPortals:"M4 5.5h16v10H4v-10Z M9 19.5h6 M12 15.5v4 M8 9.5h4 M8 12h6",
+  navMessages:"M20.5 11.5a8.2 8.2 0 0 1-8.7 8.2 9.6 9.6 0 0 1-3.9-.8L3.5 20.5l1.6-4.2a8 8 0 0 1-1.1-4.8A8.4 8.4 0 0 1 12.3 3.3a8.3 8.3 0 0 1 8.2 8.2Z M8.5 11.5h7 M8.5 14.5h4",
+  navReports:"M7 3.6h7l4.5 4.5v12.3H7V3.6Z M13.8 3.8v4.6h4.6 M10 16.5v-3 M12.8 16.5v-5 M15.6 16.5v-2",
   navEvents:"M8 4v3 M16 4v3 M4.5 9.5h15 M6.4 6h11.2A1.9 1.9 0 0 1 19.5 8v10a1.9 1.9 0 0 1-1.9 1.9H6.4A1.9 1.9 0 0 1 4.5 18V8A1.9 1.9 0 0 1 6.4 6Z M8.5 13.5h2.5 M13 13.5h2.5 M8.5 16.5h2.5",
   navWorkforce:"M9 12a3.2 3.2 0 1 0 0-6.4A3.2 3.2 0 0 0 9 12Z M16.5 12.5a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z M2.6 19.6c.8-2.8 3.2-4.4 6.4-4.4s5.6 1.6 6.4 4.4 M17 15.4c2.2.4 3.7 1.8 4.3 4.2",
   navStaffing:"M10 11.5a3.3 3.3 0 1 0 0-6.6 3.3 3.3 0 0 0 0 6.6Z M3.6 19.6c.8-2.9 3.2-4.5 6.4-4.5 1.3 0 2.5.3 3.5.8 M16.5 14.5v6 M13.5 17.5h6",
@@ -43,8 +49,8 @@ const ICONS = {
 /* Ontology stays first and is never removed (PulseLogic enforces this too). */
 const REC_SECTIONS = [
   {id:"ontology", label:"Ontology", blurb:"How every record connects: entities, predicates and the paths between them."},
-  {id:"files", label:"Files", blurb:"Documents, contracts and certificates — indexed where Helios can read them."},
-  {id:"contacts", label:"Clients & contacts", blurb:"Office staff and the sample client contacts. Client records stay owned by Bullhorn."},
+  {id:"files", label:"Files", blurb:"Booking briefs, certificates and Bullhorn exports, searchable from the chat."},
+  {id:"contacts", label:"Clients & contacts", blurb:"The OSS office team and client contacts. Client records stay owned by Bullhorn."},
   {id:"directory", label:"Directory", blurb:"Search every record."},
   {id:"venues", label:"Venues", blurb:"Venue details and verification settings."},
   {id:"audit", label:"Audit references", blurb:"Integration identifiers and provenance."}
@@ -52,66 +58,66 @@ const REC_SECTIONS = [
 
 const CONTACTS = [
   ["Shane Esler","Director of Operations","shane@ossrecruitment.ie","OSS Recruitment","staff","var(--accent)"],
-  ["Aoife Byrne","Events Manager (demo persona)","demo.aoife@ossrecruitment.ie","OSS Recruitment","staff","#9fd6f0"],
-  ["Darragh Kelly","Events Coordinator (demo persona)","demo.darragh@ossrecruitment.ie","OSS Recruitment","staff","#e6c78a"],
-  ["Sarah Nolan","Events Coordinator (demo persona)","demo.sarah@ossrecruitment.ie","OSS Recruitment","staff","#c8b4f0"],
-  ["Mark Walsh","Site Supervisor (demo persona)","demo.mark@ossrecruitment.ie","OSS Recruitment","staff","#a8e0c0"],
-  ["Nessa Doyle","Compliance Administrator (demo persona)","demo.nessa@ossrecruitment.ie","OSS Recruitment","staff","#e2a08c"],
-  ["Emma Ryan","Hours Administrator (demo persona)","demo.emma@ossrecruitment.ie","OSS Recruitment","staff","#9fd6f0"],
-  ["Conor Murphy","Recruitment Lead (demo persona)","demo.conor@ossrecruitment.ie","OSS Recruitment","staff","#e6c78a"],
-  ["Booking desk (sample persona)","Sample booking contact","bookings.sample@example.test","Aiken Promotions","client","#c8b4f0"],
-  ["Gráinne Lacey","Operations manager (fictional)","grainne.lacey@example.test","Lansdowne Event Services Ltd","client","#a8e0c0"],
-  ["Paul Sheridan","Event lead (fictional)","paul.sheridan@example.test","National Sports Event Services Ltd","client","#e2a08c"],
-  ["Niamh Brophy","Account director (fictional)","niamh.brophy@example.test","Quayside Events Ltd","client","#9fd6f0"],
-  ["Ross Hayden","Venue producer (fictional)","ross.hayden@example.test","Quayside Events Ltd","client","#e6c78a"],
-  ["Ellen Mahon","Production manager (fictional)","ellen.mahon@example.test","Dockside Production Services Ltd","client","#c8b4f0"]
+  ["Aoife Byrne","Events Manager","demo.aoife@ossrecruitment.ie","OSS Recruitment","staff","#9fd6f0"],
+  ["Darragh Kelly","Events Coordinator","demo.darragh@ossrecruitment.ie","OSS Recruitment","staff","#e6c78a"],
+  ["Sarah Nolan","Events Coordinator","demo.sarah@ossrecruitment.ie","OSS Recruitment","staff","#c8b4f0"],
+  ["Mark Walsh","Site Supervisor","demo.mark@ossrecruitment.ie","OSS Recruitment","staff","#a8e0c0"],
+  ["Nessa Doyle","Compliance Administrator","demo.nessa@ossrecruitment.ie","OSS Recruitment","staff","#e2a08c"],
+  ["Emma Ryan","Hours Administrator","demo.emma@ossrecruitment.ie","OSS Recruitment","staff","#9fd6f0"],
+  ["Conor Murphy","Recruitment Lead","demo.conor@ossrecruitment.ie","OSS Recruitment","staff","#e6c78a"],
+  ["Booking desk","Production bookings","bookings.sample@example.test","Aiken Promotions","client","#c8b4f0"],
+  ["Gráinne Lacey","Operations manager","grainne.lacey@example.test","Lansdowne Event Services Ltd","client","#a8e0c0"],
+  ["Paul Sheridan","Event lead","paul.sheridan@example.test","National Sports Event Services Ltd","client","#e2a08c"],
+  ["Niamh Brophy","Account director","niamh.brophy@example.test","Quayside Events Ltd","client","#9fd6f0"],
+  ["Ross Hayden","Venue producer","ross.hayden@example.test","Quayside Events Ltd","client","#e6c78a"],
+  ["Ellen Mahon","Production manager","ellen.mahon@example.test","Dockside Production Services Ltd","client","#c8b4f0"]
 ];
 
 const FILE_TREE = [
   {type:"folder", id:"f-book", name:"Bookings", depth:0},
   {type:"file", id:"fl-1", name:"EVT-001 3Arena arena crew: booking brief.pdf", depth:1, parent:"f-book", indexed:true,
-   path:"Bookings / EVT-001", title:"3Arena arena crew: booking brief (sample)",
-   facts:[["TYPE","PDF · 2 pages (sample)"],["ADDED","6 Nov 2026"],["INDEXED","Both pages"],["OWNER","Darragh Kelly"]],
-   body:["Sample booking for Aiken Promotions at 3Arena on Saturday 14 November: ten set-up crew 08:00 to 13:00 and twenty event crew 17:00 to 23:00.",
+   path:"Bookings / EVT-001", title:"3Arena arena crew: booking brief",
+   facts:[["TYPE","PDF · 2 pages"],["ADDED","6 Nov 2026"],["INDEXED","Both pages"],["OWNER","Darragh Kelly"]],
+   body:["Booking for Aiken Promotions at 3Arena on Saturday 14 November: ten set-up crew 08:00 to 13:00 and twenty event crew 17:00 to 23:00.",
      "Safety boots, high-visibility jacket and gloves are required. Manual Handling evidence must be valid through the end of each shift.",
-     "Meeting point: OSS supervisor at the loading access; the exact gate is confirmed before dispatch. No gate, code or site plan is stated here."],
+     "Meeting point: OSS supervisor at the loading bay. Venue QR code at the staff entrance; GPS check-in within 50 m."],
    links:[["Aiken Promotions","org"],["Darragh Kelly","person"],["EVT-001","event"]]},
   {type:"file", id:"fl-2", name:"Winter corporate reception: headcount request.docx", depth:1, parent:"f-book", indexed:true,
    path:"Bookings / EVT-005", title:"Winter corporate reception: headcount request",
-   facts:[["TYPE","DOCX · 1 page (sample)"],["ADDED","10 Nov 2026"],["INDEXED","Yes"],["OWNER","Darragh Kelly"]],
+   facts:[["TYPE","DOCX · 1 page"],["ADDED","10 Nov 2026"],["INDEXED","Yes"],["OWNER","Darragh Kelly"]],
    body:["Pending booking for Quayside Events Ltd on 20 November. Eighteen indicative positions, awaiting the client's headcount approval.",
      "Pending demand is kept out of firm coverage until the booking is confirmed."],
    links:[["Quayside Events Ltd","org"],["EVT-005","event"]]},
-  {type:"folder", id:"f-comp", name:"Compliance (synthetic)", depth:0},
-  {type:"file", id:"fl-3", name:"Manual Handling register (sample).xlsx", depth:1, parent:"f-comp", indexed:true,
-   path:"Compliance / Registers", title:"Manual Handling register (sample)",
-   facts:[["TYPE","XLSX · 1 sheet (sample)"],["UPDATED","12 Nov 2026"],["INDEXED","Yes"],["OWNER","Nessa Doyle"]],
-   body:["Synthetic register of Manual Handling evidence for the 96 sample profiles. No real certificates are stored in this demo.",
+  {type:"folder", id:"f-comp", name:"Compliance", depth:0},
+  {type:"file", id:"fl-3", name:"Manual Handling register.xlsx", depth:1, parent:"f-comp", indexed:true,
+   path:"Compliance / Registers", title:"Manual Handling register",
+   facts:[["TYPE","XLSX · 1 sheet"],["UPDATED","12 Nov 2026"],["INDEXED","Yes"],["OWNER","Nessa Doyle"]],
+   body:["Manual Handling evidence for every active employee, with issue and expiry dates.",
      "Eoin Brennan's record is valid through 13 November only. Maeve Duffy's expires on 28 November. Tomas Nowak's upload is awaiting review."],
    links:[["Nessa Doyle","person"],["Documents","area"]]},
-  {type:"file", id:"fl-4", name:"W035 Manual Handling upload (synthetic placeholder).pdf", depth:1, parent:"f-comp", indexed:false,
-   path:"Compliance / Uploads", title:"W035 Manual Handling upload (synthetic placeholder)",
-   facts:[["TYPE","Placeholder"],["UPLOADED","11 Nov 2026 19:42"],["INDEXED","Not indexed"],["OWNER","Compliance"]],
-   body:["Labelled synthetic placeholder standing in for a worker's upload. Uploaded is not approved; review is pending.",
-     "Review checks the record is complete and in date. It does not verify authenticity."],
+  {type:"file", id:"fl-4", name:"Tomas Nowak Manual Handling certificate.pdf", depth:1, parent:"f-comp", indexed:false,
+   path:"Compliance / Uploads", title:"Tomas Nowak: Manual Handling certificate",
+   facts:[["TYPE","PDF · 1 page"],["UPLOADED","11 Nov 2026 19:42"],["INDEXED","Not indexed"],["OWNER","Compliance"]],
+   body:["Uploaded from OSS Crew. Waiting for compliance review before it counts for any shift.",
+     "Review checks the certificate is complete and in date."],
    links:[["Nessa Doyle","person"]]},
-  {type:"folder", id:"f-hand", name:"Handover (simulated)", depth:0},
-  {type:"file", id:"fl-5", name:"BH-1111-01 reconciliation (simulated).csv", depth:1, parent:"f-hand", indexed:true,
-   path:"Handover / Batches", title:"BH-1111-01 reconciliation (simulated)",
+  {type:"folder", id:"f-hand", name:"Bullhorn handover", depth:0},
+  {type:"file", id:"fl-5", name:"BH-1111-01 reconciliation.csv", depth:1, parent:"f-hand", indexed:true,
+   path:"Handover / Batches", title:"BH-1111-01 reconciliation",
    facts:[["TYPE","CSV · 12 rows"],["CREATED","12 Nov 2026"],["INDEXED","Yes"],["OWNER","Emma Ryan"]],
    body:["Twelve approved five-hour lines from the 11 November Storehouse evening, 60 hours in total.",
-     "Eleven were accepted by the simulated adapter (55 hours). Jamie Allen's line is blocked because the worker has no Bullhorn candidate mapping.",
+     "Eleven were accepted by Bullhorn (55 hours). Jamie Allen's line is blocked because the worker has no Bullhorn candidate mapping.",
      "An accepted receipt is not a payment and not an invoice."],
    links:[["Emma Ryan","person"],["BH-1111-01","batch"]]},
-  {type:"file", id:"fl-6", name:"TeamTrack export (to validate).xlsx", depth:1, parent:"f-hand", indexed:false,
-   path:"Handover / Migration", title:"TeamTrack export (to validate)",
-   facts:[["TYPE","Placeholder"],["ADDED","Not yet"],["INDEXED","Not indexed"],["OWNER","Events"]],
-   body:["Placeholder for a real TeamTrack export. No data has been imported; ownership, duplicates and history are workshop items."],
+  {type:"file", id:"fl-6", name:"TeamTrack export.xlsx", depth:1, parent:"f-hand", indexed:false,
+   path:"Handover / Migration", title:"TeamTrack export",
+   facts:[["TYPE","XLSX"],["ADDED","Due before go-live"],["INDEXED","Not indexed"],["OWNER","Events"]],
+   body:["TeamTrack export to migrate: staff profiles, documents and event history, checked for duplicates on import."],
    links:[["Aoife Byrne","person"]]}
 ];
 
 const ONTO_NODES = [
-  ["Worker","entity",500,300,1,"A sample worker profile: roles, availability, documents and history."],
+  ["Worker","entity",500,300,1,"An employee: roles, availability, documents and history."],
   ["Client","entity",300,190,1,"The booking client. Kept separate from the venue and the event."],
   ["Venue","entity",700,190,1,"Where work happens, with meeting point and verification settings."],
   ["Event","entity",250,430,1,"A booking for a client at a venue, with one or more shifts."],
@@ -119,7 +125,7 @@ const ONTO_NODES = [
   ["Invitation","entity",850,320,0,"One worker, one shift, one decision."],
   ["Clock entry","ledger",390,95,0,"Raw GPS, QR, offline or supervisor records. Never overwritten."],
   ["Timesheet","ledger",620,95,0,"Derived from verified clocks and approved corrections."],
-  ["Handover item","module",860,470,0,"A simulated Bullhorn row with a stable transfer key."],
+  ["Handover item","module",860,470,0,"An approved-hours row sent to Bullhorn with a stable transfer key."],
   ["Document","entity",140,300,0,"Evidence with issue, expiry and review state."],
   ["books","predicate",395,240,0,"Client → Event."],
   ["held at","predicate",605,240,0,"Event → Venue."],
@@ -136,7 +142,7 @@ const ONTO_EDGES = [
 ];
 
 const REC_TEMPLATES = [
-  ["Field sheet","Records","Labelled fields in a grid — the default for a person, organisation or location.",
+  ["Field sheet","Records","Labelled fields in a grid, the default for a person, organisation or location.",
    "M5 5.5h14v13H5v-13Z M5 10h14 M12 10v8.5","grid"],
   ["Contact card","Records","A portrait, key fields and every linked record in one compact panel.",
    "M12 11.5a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8Z M5.5 19c.8-3 3.3-4.7 6.5-4.7s5.7 1.7 6.5 4.7","card"],
@@ -150,11 +156,11 @@ const REC_TEMPLATES = [
    "M5 6.5h2l1.4 1.4L11 5.5 M5 12.5h2l1.4 1.4 2.6-2.4 M5 18.5h2l1.4 1.4 2.6-2.4 M15 6.5h4 M15 12.5h4 M15 18.5h4","checklist"],
   ["Ledger","Finance","Rows and running totals. For anything with amounts and dates.",
    "M4 6h16 M4 12h16 M4 18h16 M9 3.5v17","ledger"],
-  ["Invoice","Finance","Line items, totals and a status — built to be sent, not just stored.",
+  ["Invoice","Finance","Line items, totals and a status, built to be sent, not just stored.",
    "M7 3.5h10v17H7v-17Z M9.5 8h5 M9.5 11.5h5 M9.5 15h3","invoice"],
   ["Document","Notes","Long-form text with linked records pulled out down the side.",
    "M7 3.5h7l5 5v12H7v-17Z M14 3.7v5h5 M10 13h6 M10 16.5h4","document"],
-  ["Gallery","Notes","A wall of images and files with a caption on each — for a site or a job.",
+  ["Gallery","Notes","A wall of images and files with a caption on each, for a site or a job.",
    "M4.5 6h6v6h-6V6Z M13.5 6h6v6h-6V6Z M4.5 14h6v4h-6v-4Z M13.5 14h6v4h-6v-4Z","gallery"],
   ["Map & locations","Ops","A pinboard of places, with the record's fields beside each pin.",
    "M12 21s6.5-5.6 6.5-11a6.5 6.5 0 1 0-13 0C5.5 15.4 12 21 12 21Z M12 12.8a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z","map"],
@@ -170,8 +176,8 @@ const PEOPLE = [
   ["Field user","Senior installer","seamus@example.test","Depot B","active","Standard","1 h ago"],
   ["Ops user","Operations lead","tom@example.test","Head office","active","Manager","34 min ago"],
   ["Counter user","Trade counter","niamh@example.test","Depot B","active","Standard","3 h ago"],
-  ["Sample contact B","Buyer · Sample Org B","dermot@sample-org-b.example.test","—","external","External","2 days ago"],
-  ["Sample contact A","Owner · Sample Org A","liam@sample-org-a.example.test","—","inactive","External","19 days ago"]
+  ["Sample contact B","Buyer · Sample Org B","dermot@sample-org-b.example.test","-","external","External","2 days ago"],
+  ["Sample contact A","Owner · Sample Org A","liam@sample-org-a.example.test","-","inactive","External","19 days ago"]
 ];
 const ROLE_LEVELS = ["Admin","Manager","Standard","External"];
 const PERM_KEYS = [["view","View records"],["edit","Edit records"],["approve","Approve payments"]];
@@ -189,12 +195,12 @@ const ROLE_SCOPES = ["All records","Their location","Assigned only"];
 const DEFAULT_PERMS = {Admin:{view:true,edit:true,approve:true}, Manager:{view:true,edit:true,approve:true},
   Standard:{view:true,edit:true,approve:false}, External:{view:true,edit:false,approve:false}};
 const INTEGRATIONS = [
-  {name:"Gmail", blurb:"Mail in and out of Pulse — threads attach to the record they mention, and drafts wait for your yes.", tint:"#ea4335", status:"connected", statusKind:"ok",
+  {name:"Gmail", blurb:"Mail in and out of Pulse, threads attach to the record they mention, and drafts wait for your yes.", tint:"#ea4335", status:"connected", statusKind:"ok",
    glyph:"M4 7.2 12 13 20 7.2 M4 7.2v10.6h16V7.2 M4 7.2 8.5 4h7L20 7.2",
    lastSync:"2 min ago", usage:"340 emails/day", auth:"OAuth 2.0", scopes:["Read","Send"]},
   {name:"Ledger", blurb:"Invoices, payments and credit notes sync both ways, so the ledger and the record spine never drift.", tint:"#13b5ea", status:"disconnected", statusKind:"bad",
    glyph:"M4.5 12a7.5 7.5 0 0 1 12.8-5.3 M19.5 12a7.5 7.5 0 0 1-12.8 5.3 M17.3 4v3.3h-3.3 M6.7 20v-3.3H10",
-   lastSync:"27 Feb — token expired", usage:"148 invoices queued", auth:"OAuth 2.0", scopes:["Read","Write"]},
+   lastSync:"27 Feb, token expired", usage:"148 invoices queued", auth:"OAuth 2.0", scopes:["Read","Write"]},
   {name:"Sage", blurb:"Nightly read of the chart of accounts and balances, mapped onto Pulse organisations.", tint:"#00d639", status:"read only", statusKind:"warn",
    glyph:"M4 8 12 4.5 20 8 12 11.5 4 8Z M4 13 12 16.5 20 13 M4 18 12 21.5 20 18",
    lastSync:"14 min ago", usage:"9 accounts synced nightly", auth:"API key", scopes:["Read"]},
@@ -204,12 +210,12 @@ const INTEGRATIONS = [
   {name:"WhatsApp Business", blurb:"Send updates and chase messages from the record, logged against it as they go.", tint:"#25d366", status:"write only", statusKind:"warn",
    glyph:"M4 19.5 5.3 15A7.7 7.7 0 1 1 8.6 18.2L4 19.5Z M8.6 10.3c0 3 2.4 5.4 5.4 5.4",
    lastSync:"11 min ago", usage:"62 messages/day", auth:"API key", scopes:["Send"]},
-  {name:"Resend", blurb:"Transactional email for everything Pulse generates — reminders, briefings and receipts.", tint:"var(--accent)", status:"write only", statusKind:"warn",
+  {name:"Resend", blurb:"Transactional email for everything Pulse generates, reminders, briefings and receipts.", tint:"var(--accent)", status:"write only", statusKind:"warn",
    glyph:"M3.5 12 20.5 4 16 20l-3.4-6.6L3.5 12Z",
    lastSync:"38 min ago", usage:"210 emails/day", auth:"API key", scopes:["Send"]},
   {name:"Composio", blurb:"One connector for the long tail of tools, so a new system does not need a new build.", tint:DIM, status:"not connected", statusKind:"off",
    glyph:"M9 3v5 M15 3v5 M6 8h12v3.5a6 6 0 0 1-12 0V8Z M12 17.5V21",
-   lastSync:"—", usage:"—", auth:"—", scopes:[]}
+   lastSync:"-", usage:"-", auth:"-", scopes:[]}
 ];
 
 /* Background catalogue. Each entry is pure CSS so a tile is the real thing at
@@ -304,7 +310,7 @@ const ADMIN_CARDS = [
    blurb:"Permission templates, and exactly what each person can reach.",
    tags:["4 roles","64 permissions","3 scopes"],
    heroLabel:"THE QUESTION THIS ANSWERS", heroAction:"Show me what someone can access",
-   heroText:"Pick a person and see every record, action and export they can reach — resolved through their grants, not guessed from the menus.",
+   heroText:"Pick a person and see every record, action and export they can reach, resolved through their grants, not guessed from the menus.",
    footer:"Preview Pulse as another user", action:"Open preview",
    listLabel:"WHAT YOU CONTROL HERE",
    rows:[["Create permission templates","4 in use"],["View, edit, export and delete access","per permission"],
@@ -328,7 +334,7 @@ const ADMIN_CARDS = [
      ["Control which actions agents can take","read · write · external"],["Set approval requirements","all write tools", true],
      ["Set spending and usage limits","€40/month cap"],["Manage agent memory and retention","90 days"]]},
   {id:"wf", group:"CONTROL", title:"Workflow controls", icon:"flow", tint:"#9d8cf5",
-   blurb:"The guardrails, not the builder — that lives under Work.",
+   blurb:"The guardrails, not the builder, that lives under Work.",
    tags:["Managers only","2 approval rules","Retry twice"],
    footer:"Building workflows happens in Work", action:"Open Work",
    listLabel:"WHAT YOU CONTROL HERE",
@@ -344,7 +350,7 @@ const ADMIN_CARDS = [
      ["Quiet hours","19:00–07:00"],["Daily and weekly summaries","07:00 daily"]]},
 
   {id:"integrations", group:"SYSTEMS", title:"Integrations", icon:"plug", tint:"#6ad0f0",
-   blurb:"Email, accounting, CRM and messaging — and which way data flows.",
+   blurb:"Email, accounting, CRM and messaging, and which way data flows.",
    tags:["6 connected","1 disconnected","2 read-only"], badge:"Ledger down", badgeKind:"bad",
    footer:"Ledger token expired 27 February", action:"Reconnect",
    listLabel:"CONNECTIONS",
@@ -354,7 +360,7 @@ const ADMIN_CARDS = [
    blurb:"Turn modules on, and make Pulse speak the business's own words.",
    tags:["3 installed","1 available","2 renamed terms"],
    heroLabel:"TERMINOLOGY", heroAction:"Edit terminology",
-   heroText:"Organisation reads as Merchant, and Task reads as Job, everywhere in the interface — including what Helios says back to you.",
+   heroText:"Organisation reads as Merchant, and Task reads as Job, everywhere in the interface, including what Helios says back to you.",
    listLabel:"WHAT YOU CONTROL HERE",
    rows:[["Enable or disable modules","3 installed"],["Rename business terminology","2 overridden"],
      ["Create custom fields","9 fields"],["Configure statuses","6 sets"],["Edit record types","7 types"],
@@ -392,7 +398,7 @@ const ADMIN_CARDS = [
    rows:[["Permission changes","41 this month"],["Employee access","118"],["Data exports","9"],
      ["Integration changes","6"],["Agent actions","2,140"],["Deleted records","3"],["Admin changes","27"]]},
   {id:"datamgmt", group:"GOVERNANCE", title:"Data management", icon:"data", tint:"#5fe0a8",
-   blurb:"Import, export, restore and — carefully — delete.",
+   blurb:"Import, export, restore and, carefully, delete.",
    tags:["Backup 02:00","30-day restore"],
    footer:"Last backup completed 02:00 today", action:"Run backup",
    listLabel:"WHAT YOU CONTROL HERE",
@@ -429,13 +435,13 @@ const SRC_ABBR = {Gmail:"GM", Pulse:"PL", Sage:"SG", WhatsApp:"WA", HubSpot:"HS"
 const DATA_EVENTS = [
   ["New customer created","McKenna Transport was added from a web enquiry.","Web form","McKenna Transport","Pulse","completed"],
   ["Invoice imported","INV-10512 for €3,240 arrived from Sage and matched to an open order.","Sage sync","Sample Org B","Sage","completed"],
-  ["Email received","Purchase order attached — parsed and filed against the account.","accounts@sample-org-b.example.test","Sample Org B","Gmail","completed"],
-  ["File uploaded","Signed framework 2026.pdf — 6 pages indexed for Helios.","Accounts user","Sample Org B","Pulse","completed"],
+  ["Email received","Purchase order attached, parsed and filed against the account.","accounts@sample-org-b.example.test","Sample Org B","Gmail","completed"],
+  ["File uploaded","Signed framework 2026.pdf, 6 pages indexed for Helios.","Accounts user","Sample Org B","Pulse","completed"],
   ["42 records imported","Nightly Sage sync brought in 42 invoice lines across 9 accounts.","Sage sync","9 organisations","Sage","completed"],
   ["CRM record updated","Credit limit changed on the account after the August review.","HubSpot sync","Sample Org C","HubSpot","completed"],
   ["Form submitted","Site survey request for a boiler replacement in Site C.","Web form","Sample Org E, Site C","Pulse","completed"],
   ["WhatsApp message received","Photo of the meter reading filed against the visit.","Field user","Depot B","WhatsApp","completed"],
-  ["External system synced","Ledger connection retried and failed — token still expired.","Ledger","148 invoices queued","Ledger","failed"]
+  ["External system synced","Ledger connection retried and failed, token still expired.","Ledger","148 invoices queued","Ledger","failed"]
 ];
 
 const PEOPLE_EVENTS = [
@@ -444,9 +450,9 @@ const PEOPLE_EVENTS = [
   ["Mac assigned a task","Lease decision handed to himself, due Thursday.","Director","Depot B","Pulse","completed"],
   ["Finance uploaded a report","August month-end close workbook, nine sheets.","Accounts user","Head office","Pulse","completed"],
   ["Niamh edited customer details","Billing email corrected so reminders stop bouncing.","Counter user","Sample Org A","Pulse","completed"],
-  ["Séamus completed a visit","Warranty callback closed — parts ordered on the spot.","Field user","Sample Org C","Pulse","completed"],
+  ["Séamus completed a visit","Warranty callback closed, parts ordered on the spot.","Field user","Sample Org C","Pulse","completed"],
   ["Purchase order raised","PO-4471 for €14,280 sent up for sign-off.","Accounts user","Supplier D","Pulse","awaiting"],
-  ["Credit limit increase requested","€10,000 to €18,000 — waiting on the second approval.","Counter user","Sample Org B","Pulse","awaiting"]
+  ["Credit limit increase requested","€10,000 to €18,000, waiting on the second approval.","Counter user","Sample Org B","Pulse","awaiting"]
 ];
 
 const AI_EVENTS = [
@@ -454,7 +460,7 @@ const AI_EVENTS = [
   ["Sales Agent qualified a new lead","McKenna Transport scored 82/100 on company size, location and enquiry detail.","Sales Agent","McKenna Transport","HubSpot","working"],
   ["Operations Agent updated a schedule","Vehicle 4's jobs redistributed across two installers.","Operations Agent","Depot B","Agent","working"],
   ["Helios prepared a report","Weekly management one-pager written and filed.","Helios","Management","Agent","working"],
-  ["Agent paused for approval","Chase email to Sample Org A drafted — needs your yes before it sends.","Finance Agent","Sample Org A","Agent","awaiting"],
+  ["Agent paused for approval","Chase email to Sample Org A drafted, needs your yes before it sends.","Finance Agent","Sample Org A","Agent","awaiting"],
   ["Workflow failed","Certificate renewal reminder could not find a contact for Site C.","Operations","Site C","Agent","failed"],
   ["Stock Watch raised order lines","Two lines below reorder point before Thursday's jobs.","Stock Watch","Supplier D","Agent","working"],
   ["Briefing Agent posted the morning brief","Two items needed you; the rest was noise.","Briefing Agent","Director","WhatsApp","completed"]
@@ -469,17 +475,29 @@ const STREAM_DEFS = [
    tint:"var(--accent)", icon:"M2 12h4l2.5-6 3.5 12 3-8 2 2h5"}
 ];
 
-/* Agents sits directly under Home (locked by the template); then the OSS operating areas. */
+/* Agents sits directly under Home (locked by the template); then OSS's operating areas,
+   in the order of the requirements sheet: dashboard, events, staffing, employees,
+   communication, live attendance, timesheets and reporting. */
 const NAV = [
   {label:"Home", icon:"helios", page:"Home"},
   {label:"Agents", icon:"navAgents", page:"Agents"},
-  {label:"Events", icon:"navEvents", page:"Events"},
-  {label:"Workforce", icon:"navWorkforce", page:"Workforce"},
-  {label:"Staffing", icon:"navStaffing", page:"Staffing"},
-  {label:"Live Operations", icon:"navLive", page:"Live Operations"},
-  {label:"Timesheets", icon:"navTimesheets", page:"Timesheets"},
-  {label:"Work", icon:"navWork", page:"Work"},
+  {label:"Calendar", icon:"navEvents", page:"Calendar"},
+  {label:"Clients", icon:"navClients", page:"Clients"},
   {label:"Dashboard", icon:"navDash", page:"Dashboard"},
+  {divider:true, label:"RUN EVENTS"},
+  {label:"Events", icon:"navEvents", page:"Events"},
+  {label:"Staffing", icon:"navStaffing", page:"Staffing"},
+  {label:"Event day", icon:"navLive", page:"Attendance"},
+  {label:"Timesheets", icon:"navTimesheets", page:"Timesheets"},
+  {divider:true, label:"CREW"},
+  {label:"Crew", icon:"navWorkforce", page:"Staff"},
+  {label:"Recruitment", icon:"navRecruit", page:"Recruitment"},
+  {label:"Compliance", icon:"navCompliance", page:"Compliance"},
+  {label:"Messages", icon:"navMessages", page:"Messages"},
+  {divider:true, label:"PORTALS"},
+  {label:"Portals", icon:"navPortals", page:"Portals"},
+  {divider:true, label:"RUN THE BUSINESS"},
+  {label:"Reports", icon:"navReports", page:"Reports"},
   {label:"Records", icon:"navRecords", page:"Records"},
   {label:"Activity", icon:"pulseLine", page:"Activity"}
 ];
@@ -487,23 +505,23 @@ const NAV = [
 /* Inbox items follow the real InboxItem shape: what happened, why it matters, what I can do. */
 const ITEMS = {
   po:{kind:"Approval", importance:"high", icon:ICONS.approvals, age:"18m",
-    title:"Purchase order PO-4471 — €14,280",
+    title:"Purchase order PO-4471, €14,280",
     why:"Raised by Accounts user. €4,280 above your sign-off threshold, so it routed to you.",
     detail:"Both lines are below reorder point and committed to Thursday's jobs. Pricing matches the June supplier agreement. Approving writes the decision as you and fires core.approval.updated.",
     actionLabel:"Approve", secondaryLabel:"Request changes", group:"Approvals",
     fields:[{k:"Provider",v:"core.approvals"},{k:"Requested by",v:"Accounts user"},{k:"Value",v:"€14,280"},{k:"Record",v:"PO-4471"}],
-    history:[{when:"Today 08:54",text:"Accounts user raised the request"},{when:"Today 08:54",text:"Routed to Director — over threshold"}]},
+    history:[{when:"Today 08:54",text:"Accounts user raised the request"},{when:"Today 08:54",text:"Routed to Director, over threshold"}]},
   sync:{kind:"Alert", importance:"critical", icon:ICONS.health, age:"6h",
-    title:"Ledger sync failed — expired token",
+    title:"Ledger sync failed, expired token",
     why:"148 invoices have been queued since 02:14. Reconnecting posts them automatically.",
     detail:"The refresh token was last authorised on 27 February. Third failure this year; moving the connection to the service account would stop it recurring. The dispatcher retried twice before dead-lettering.",
     actionLabel:"Reconnect", secondaryLabel:"Snooze", group:"Alerts",
     fields:[{k:"Provider",v:"core.notifications"},{k:"Integration",v:"Ledger"},{k:"Queued",v:"148 invoices"},{k:"Event",v:"core.automation.failed"}],
-    history:[{when:"Today 02:14",text:"Sync failed — invalid_grant"},{when:"Today 02:16",text:"Retried twice, then dead-lettered"}]},
+    history:[{when:"Today 02:14",text:"Sync failed, invalid_grant"},{when:"Today 02:16",text:"Retried twice, then dead-lettered"}]},
   visit:{kind:"Task", importance:"high", icon:ICONS.visits, age:"2h",
     title:"Site visit at Depot B is unassigned",
     why:"Scheduled for tomorrow 09:00 with no installer against it.",
-    detail:"Contributed by the site-visits module through its own inbox provider. Core never learns what a visit is — it sorts by importance and age like everything else.",
+    detail:"Contributed by the site-visits module through its own inbox provider. Core never learns what a visit is, it sorts by importance and age like everything else.",
     actionLabel:"Assign installer", secondaryLabel:"Reschedule", group:"Work",
     fields:[{k:"Provider",v:"site-visits.unassigned"},{k:"Entity",v:"site-visits.visit"},{k:"Scheduled",v:"Tomorrow 09:00"},{k:"Status",v:"scheduled"}],
     history:[{when:"Yesterday 16:20",text:"Visit created by Ops user"},{when:"Today 07:00",text:"Flagged unassigned by the briefing job"}]},
@@ -537,22 +555,22 @@ const ANSWERS = {
     actions:[["Reassign the two van tasks",1],["Open Work → Overdue",0]]},
   chase:{tool:"core_email_draft", effect:"write", confirm:true,
     confirmSummary:"Send one chase email to accounts@sample-org-a.example.test referencing INV-10428 (€28,410, 74 days), offering two instalments to 30 September.",
-    text:"Drafted. This is a write tool, so I have not sent it — the proposal is stored with a hash of the exact arguments, and confirming replays those stored arguments rather than anything from your yes.",
+    text:"Drafted. This is a write tool, so I have not sent it, the proposal is stored with a hash of the exact arguments, and confirming replays those stored arguments rather than anything from your yes.",
     actions:[["Confirm and send",1],["Edit draft",0]]},
   sync:{tool:"core_operations_health", effect:"read",
-    text:"The Ledger connection failed at 02:14 with an expired refresh token — last authorised 27 February. Nothing was lost: 148 invoices are queued and post once reconnected. This is the third token failure this year, so it is worth moving the connection to the service account.",
+    text:"The Ledger connection failed at 02:14 with an expired refresh token, last authorised 27 February. Nothing was lost: 148 invoices are queued and post once reconnected. This is the third token failure this year, so it is worth moving the connection to the service account.",
     actions:[["Open System health",1],["Assign to Aoife",0]]},
   visits:{tool:"site_visits_find", effect:"read",
-    text:"Four site visits are booked this week and one has no installer against it. That tool is contributed by the site-visits module, not core — installing the module is what gave me the ability to answer this.",
+    text:"Four site visits are booked this week and one has no installer against it. That tool is contributed by the site-visits module, not core, installing the module is what gave me the ability to answer this.",
     cols:["Visit","Organisation","When","Status"],
     rows:[["Boiler service","Sample Org B","Wed 09:00","scheduled"],["Survey","Sample Org E","Wed 14:00","scheduled"],["Depot check","Depot B","Thu 09:00","unassigned"]],
     actions:[["Assign the unassigned visit",1],["Open Site visits",0]]},
   fallback:{tool:"core_search", effect:"read",
-    text:"I can answer that from the records you have access to. Everything I reach goes through a registered tool with a declared permission — there is no SQL tool — and a record you may not see comes back as not found rather than forbidden.",
+    text:"I can answer that from the records you have access to. Everything I reach goes through a registered tool with a declared permission, there is no SQL tool, and a record you may not see comes back as not found rather than forbidden.",
     actions:[["Show me what you can do",0]]}
 };
 
-// Turns a plain-English filter name into a full dashboard area — the "primitive
+// Turns a plain-English filter name into a full dashboard area, the "primitive
 // vibe-coding" bit: no real backend, just a seeded generator so the same phrase
 // always produces the same numbers, with direction and vocabulary nudged by
 // keywords in the text (expansion/growth trends up, risk/issue trends down, a
@@ -578,12 +596,12 @@ function synthesizeCustomArea(name){
   else if (has("customer","client","retention","account")) vocab = "customer";
 
   const V = {
-    region:   {labels:["New enquiries","Orders won","Revenue","Site coverage"], unit:"EUR — 30 DAYS"},
-    cost:     {labels:["Spend","Cost per job","Savings found","Budget used"], unit:"EUR — 30 DAYS"},
+    region:   {labels:["New enquiries","Orders won","Revenue","Site coverage"], unit:"EUR, 30 DAYS"},
+    cost:     {labels:["Spend","Cost per job","Savings found","Budget used"], unit:"EUR, 30 DAYS"},
     people:   {labels:["Headcount","Open roles","Time to hire","Retention"], unit:"PEOPLE"},
     ops:      {labels:["Stock cover","Lead time","Stockouts","Reorders raised"], unit:"DAYS"},
     customer: {labels:["Active accounts","Repeat rate","Churn","NPS"], unit:"ACCOUNTS"},
-    generic:  {labels:["Volume","Rate","Cost","Coverage"], unit:"ACTIVITY — 30 DAYS"}
+    generic:  {labels:["Volume","Rate","Cost","Coverage"], unit:"ACTIVITY, 30 DAYS"}
   }[vocab];
 
   const months = ["Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug"];
@@ -632,7 +650,7 @@ const ORGS = [
   ["Sample Org A","Customer","€28,410","74 days","on stop"],
   ["Sample Org B","Customer","€6,120","12 days","active"],
   ["Sample Org C","Customer","€9,240","63 days","watch"],
-  ["Supplier D","Supplier","—","—","active"],
+  ["Supplier D","Supplier","-","-","active"],
   ["Riverside Developments","Customer","€3,560","61 days","watch"],
   ["Site C Mechanical","Customer","€1,180","8 days","active"]
 ];
@@ -656,7 +674,7 @@ const AGENT_DEFS = [
      {kind:"stamp", text:"Today 09:04"},
      {kind:"routine", text:"Ran routine", routine:"Month-end close"},
      {kind:"agent", from:"credit", text:"three accounts are still open on the August ledger. Sample Org A is the only one that changed behaviour rather than just running late."},
-     {kind:"agent", from:"ops", text:"nothing technical is holding it up — the Ledger token is back and all 148 queued invoices posted at 09:02."},
+     {kind:"agent", from:"ops", text:"nothing technical is holding it up, the Ledger token is back and all 148 queued invoices posted at 09:02."},
      {kind:"agent", from:"briefing", text:"so the close is one decision, not three: what to do about Sample Org A. everything else reconciles."},
      {kind:"user", text:"instalments, two payments to end of september"},
      {kind:"agent", from:"credit", text:"drafted on those terms and parked it. sending is a write tool, so it waits for your yes."},
@@ -673,13 +691,13 @@ const AGENT_DEFS = [
        {k:"Approvals", v:"PO-4471 sitting with you since 08:54"}]},
      {kind:"agent", text:"two things need you today: the purchase order, and a yes/no on the Depot B lease. everything else is covered."},
      {kind:"user", text:"put the lease on Thursday"},
-     {kind:"agent", text:"done — task created against Depot B, due Thursday, assigned to you. i'll remind you Wednesday afternoon."}
+     {kind:"agent", text:"done, task created against Depot B, due Thursday, assigned to you. i'll remind you Wednesday afternoon."}
    ]},
   {id:"credit", name:"Credit Control", shape:"executive-capsule", tint:"#2a2118", state:"waiting", role:"Watches payment behaviour and drafts the chase before you ask",
    when:"Yesterday", preview:"three drafts parked. nothing sent.",
    thread:[
      {kind:"stamp", text:"Yesterday 16:40"},
-     {kind:"agent", text:"three accounts changed behaviour this week. i've drafted a chase for each and parked them — sending is a write tool, so they wait for you."},
+     {kind:"agent", text:"three accounts changed behaviour this week. i've drafted a chase for each and parked them, sending is a write tool, so they wait for you."},
      {kind:"user", text:"what changed on dunne"},
      {kind:"agent", text:"days-to-pay went 12 → 74 since May while order volume held steady. that pattern is a cash problem, not a dispute. i'd offer two instalments to 30 September before putting them on stop again."}
    ]},
@@ -695,13 +713,13 @@ const AGENT_DEFS = [
    when:"Mon", preview:"two lines below reorder point before thursday.",
    thread:[
      {kind:"stamp", text:"Monday 11:20"},
-     {kind:"agent", text:"two lines drop below reorder point before Thursday's jobs. Supplier D can cover both at the June agreement price — that's what PO-4471 is."}
+     {kind:"agent", text:"two lines drop below reorder point before Thursday's jobs. Supplier D can cover both at the June agreement price, that's what PO-4471 is."}
    ]},
   {id:"ops", name:"Ops Watchdog", shape:"shield", tint:"#2b1b1e", state:"attention", role:"Sits on the event queue and tells you when something stopped working",
    when:"02:16", preview:"xero token expired. 148 invoices queued, nothing lost.",
    thread:[
      {kind:"stamp", text:"Today 02:16"},
-     {kind:"agent", text:"the Ledger connection failed at 02:14 — invalid_grant, token last authorised 27 February. 148 invoices are queued and post on reconnect. third time this year; move it to the service account."}
+     {kind:"agent", text:"the Ledger connection failed at 02:14, invalid_grant, token last authorised 27 February. 148 invoices are queued and post on reconnect. third time this year; move it to the service account."}
    ]},
   {id:"counter", name:"Counter Assistant", shape:"offset-pebble", tint:"#191c1f", state:"working", role:"Answers trade-counter questions on price, stock and account status",
    when:"Fri", preview:"14 questions answered, 2 handed to niamh.",
@@ -716,7 +734,8 @@ const KPI_DEFS = {
   confirmed:{label:"Confirmed", value:"0", delta:"", dir:"up", hint:"coverage"},
   unfilled:{label:"Unfilled", value:"0", delta:"", dir:"down", hint:"incl. awaiting"},
   awaiting:{label:"Awaiting reply", value:"0", delta:"", dir:"up", hint:"open"},
-  handover:{label:"Blocked handover", value:"0", delta:"", dir:"down", hint:"simulated"}
+  handover:{label:"Blocked handover", value:"0", delta:"", dir:"down", hint:"rows"},
+  hours:{label:"Hours to approve", value:"0", delta:"", dir:"up", hint:"lines"}
 };
 
 const ASPECT_DEFS = [
@@ -737,13 +756,13 @@ const ASPECT_DEFS = [
    splitTitle:"Runs by module",
    split:[["core","1,042","81%",1],["site-visits","198","15%",0],["ui-showcase","44","4%",0]],
    tableCols:["Module","Version","Contributions","State"],
-   table:[["core","0.1.0","31 routes · 21 events","always installed"],["site-visits","1.0.0","1 entity · 2 tools","installed"],["ui-showcase","0.1.0","3 pages","installed"],["wholesale","—","6 entities · 9 tools","available"]],
+   table:[["core","0.1.0","31 routes · 21 events","always installed"],["site-visits","1.0.0","1 entity · 2 tools","installed"],["ui-showcase","0.1.0","3 pages","installed"],["wholesale","-","6 entities · 9 tools","available"]],
    metrics:[["Modules live","3","+1","up","this quarter",[.2,.2,.4,.4,.4,.6,.6,.6,1]],
      ["Helios tools","11","+2","up","registered",[.4,.44,.5,.5,.6,.6,.7,.8,.9]],
      ["Automation runs","1,284","+9%","up","30 days",[.5,.55,.6,.58,.66,.7,.72,.8,.86]],
      ["Failure rate","0.9%","−0.4pt","up","of all runs",[.8,.74,.7,.62,.6,.5,.44,.4,.32]]]},
   {id:"marketing", label:"Marketing", color:"#e6c78a", owner:"AOIFE NOLAN", description:"Reach, enquiries and what turned into an account.",
-   kind:"funnel", funnel:[["Enquiries","184","—",184],["Quoted","96","52% of enquiries",96],["Won","39","41% of quotes",39],["Repeat order","12","31% of wins",12]], chartTitle:"Enquiry to repeat order", chartUnit:"CONVERSION",
+   kind:"funnel", funnel:[["Enquiries","184","-",184],["Quoted","96","52% of enquiries",96],["Won","39","41% of quotes",39],["Repeat order","12","31% of wins",12]], chartTitle:"Enquiry to repeat order", chartUnit:"CONVERSION",
    chart:[["Sep",96,"96"],["Oct",104,"104"],["Nov",88,"88"],["Dec",112,"112"],["Jan",124,"124"],["Feb",118,"118"],["Mar",136,"136"],["Apr",142,"142"],["May",151,"151"],["Jun",164,"164"],["Jul",172,"172"],["Aug",184,"184"]],
    splitTitle:"Where they came from",
    split:[["Referral","78","42%",1],["Search","61","33%",0],["Trade shows","29","16%",0],["Direct","16","9%",0]],
@@ -759,7 +778,7 @@ const ASPECT_DEFS = [
    splitTitle:"By location",
    split:[["Head office","64","51%",1],["Depot B","48","38%",0],["Site C","14","11%",0]],
    tableCols:["Installer","Jobs","On time","Location"],
-   table:[["Field user","41","94%","Depot B"],["Ops user","34","88%","Head office"],["Counter user","28","96%","Head office"],["Unassigned","4","—","Depot B"]],
+   table:[["Field user","41","94%","Depot B"],["Ops user","34","88%","Head office"],["Counter user","28","96%","Head office"],["Unassigned","4","-","Depot B"]],
    metrics:[["Jobs completed","126","+4","up","30 days",[.5,.6,.5,.66,.6,.7,.66,.76,.84]],
      ["Overdue tasks","11","+3","down","past due",[.3,.36,.3,.44,.4,.5,.56,.7,.85]],
      ["Visits completed","38","+11%","up","30 days",[.4,.5,.6,.5,.66,.6,.72,.8,.9]],
@@ -817,7 +836,7 @@ const OPS_DEFS = [
    steps:[["Trigger","A lead is created in Pulse"],["Find","Match against existing organisations"],["Draft","Write the first reply"],["Send","Email the enquiry"],["Update","Create a quote task for the counter"]],
    runs:[["Today 16:20","6s","ok","1 lead","€0.01"],["Today 15:02","7s","ok","1 lead","€0.01"],["Today 11:48","6s","ok","1 lead","€0.01"]]},
   {id:"o4", name:"Certificate renewal reminder", kind:"routine", owner:"Operations", ownerKind:"person", initials:"TW",
-   trigger:"60 days before expiry", triggerKind:"event", next:"14:20", last:"Failed — missing contact", status:"failed", rate:71, on:true,
+   trigger:"60 days before expiry", triggerKind:"event", next:"14:20", last:"Failed, missing contact", status:"failed", rate:71, on:true,
    what:"Watches every installer certificate and insurance document, and gives sixty days' notice before one lapses.",
    why:"A lapsed certificate stopped two jobs last year.",
    saved:"3 hours a month",
@@ -884,14 +903,14 @@ const WORK_SECTIONS = [
    views:["All tasks","Due tasks","Review","Done"], filters:["Due date","Any status","Anyone","Any due date"]},
   {id:"approvals", label:"Approvals", blurb:"Requests and their steps. Every decision is written as the person who made it.",
    views:["Awaiting you","Awaiting others","Decided"], filters:["Raised date","Any value","Anyone"]},
-  {id:"workflows", label:"Workflows", blurb:"Automations and agent routines — what runs on its own, and who owns it.",
+  {id:"workflows", label:"Workflows", blurb:"Automations and agent routines, what runs on its own, and who owns it.",
    views:[], filters:[]},
   {id:"schedules", label:"Schedules", blurb:"The team calendar: when recurring work fires and what it costs the week.",
    views:[], filters:[]}
 ];
 
 const WORK_TASKS = [
-  {id:"w1", title:"Chase INV-10428 — Sample Org A", status:"In progress", priority:"High", who:"AN",
+  {id:"w1", title:"Chase INV-10428, Sample Org A", status:"In progress", priority:"High", who:"AN",
    due:"2d overdue", late:true, client:"Sample Org A", day:"Today", mins:"25 mins", view:"Due tasks"},
   {id:"w2", title:"Reassign Vehicle 4 jobs off Depot B", status:"In progress", priority:"High", who:"MK",
    due:"Due today", late:false, client:"Depot B", day:"Today", mins:"50 mins", view:"Due tasks"},
@@ -901,7 +920,7 @@ const WORK_TASKS = [
    due:"No due date", late:false, client:"Head office", day:"Any day", mins:"Mins", view:"All tasks"},
   {id:"w5", title:"Depot B lease decision", status:"Not started", priority:"High", who:"MK",
    due:"Thursday", late:false, client:"Depot B", day:"Thu", mins:"1 hour", view:"All tasks"},
-  {id:"w6", title:"VAT return — August", status:"Done", priority:"Medium", who:"AN",
+  {id:"w6", title:"VAT return, August", status:"Done", priority:"Medium", who:"AN",
    due:"Filed Friday", late:false, client:"Head office", day:"Fri", mins:"2 hours", view:"Done", done:true}
 ];
 
@@ -973,7 +992,7 @@ const TRAIN_PHASES = [
   ["Writing its own system prompt", "1,240 tokens"]
 ];
 const BRIEF_QUESTIONS = [
-  {title:"What should it cover?", sub:"Pick as many as you like — we can refine later.",
+  {title:"What should it cover?", sub:"Pick as many as you like, we can refine later.",
    options:[["Calendar","Meetings and what is coming up"],["Email","Unread and actionable inbox items"],
             ["Records","Accounts that moved since yesterday"],["Money","Cash, overdue and anything at risk"],
             ["Something else","Tell me in the next message"]]},

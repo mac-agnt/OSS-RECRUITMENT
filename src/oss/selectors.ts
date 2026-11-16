@@ -1,12 +1,31 @@
 /* Derived numbers. Every total in the product comes from here, so the Home rail,
    dashboards, drawers, agents and the phone views can never disagree. */
 
-import type { Assignment, AttendanceException, ClockEntry, DocType, EventBooking, HandoverItem, Invitation, OssState, Shift, Worker, WorkerDocument } from "./model";
+import type { Assignment, AttendanceException, ClockEntry, DocType, EventBooking, EventKind, HandoverItem, Invitation, OssState, Region, Shift, Worker, WorkerDocument } from "./model";
 import { WINDOW, docLabel } from "./seed";
 import { addDays, dayKey, fmtDayMonth, fmtTime, minutesBetween, ms, weekday, zoned } from "./time";
 
 /* ── lookups (memoised per state object) ─────────────────────────────────── */
 const idx = new WeakMap<object, { n: number; m: Map<string, any> }>();
+const grp = new WeakMap<object, Map<string, { n: number; m: Map<string, unknown[]> }>>();
+/** Rows grouped by a field, cached per array like `index`. Hot paths at company scale (thousands of rows) use this instead of filter. */
+function groups<T>(list: T[], field: string, key: (x: T) => string): Map<string, T[]> {
+  let byField = grp.get(list);
+  if (!byField) { byField = new Map(); grp.set(list, byField); }
+  let c = byField.get(field);
+  if (!c || c.n !== list.length) {
+    const m = new Map<string, unknown[]>();
+    for (const x of list) { const k = key(x); const a = m.get(k); if (a) a.push(x); else m.set(k, [x]); }
+    c = { n: list.length, m }; byField.set(field, c);
+  }
+  return c.m as Map<string, T[]>;
+}
+const NONE: never[] = [];
+export const rowsBy = <T>(list: T[], field: string, key: (x: T) => string, value: string): T[] => groups(list, field, key).get(value) || (NONE as T[]);
+const asgByShift = (s: OssState, id: string) => rowsBy(s.assignments, "shift", (a) => a.shiftId, id);
+export const asgByWorker = (s: OssState, id: string) => rowsBy(s.assignments, "worker", (a) => a.workerId, id);
+const invByShift = (s: OssState, id: string) => rowsBy(s.invitations, "shift", (i) => i.shiftId, id);
+const perAsg = <T extends { assignmentId: string }>(list: T[], id: string) => rowsBy(list, "asg", (x) => x.assignmentId, id);
 function index<T extends { id: string }>(list: T[]): Map<string, T> {
   let c = idx.get(list);
   // Engine drafts push into arrays in place, so a length change invalidates the index.
@@ -38,8 +57,8 @@ const zero = (): Coverage => ({ required: 0, confirmed: 0, awaiting: 0, allocate
 
 export function shiftCoverage(s: OssState, shiftId: string): Coverage {
   const sh = shiftOf(s, shiftId);
-  const confirmed = s.assignments.filter((a) => a.shiftId === shiftId && a.status === "confirmed").length;
-  const active = s.invitations.filter((i) => i.shiftId === shiftId && isActiveInvite(s, i)).length;
+  const confirmed = asgByShift(s, shiftId).filter((a) => a.status === "confirmed").length;
+  const active = invByShift(s, shiftId).filter((i) => isActiveInvite(s, i)).length;
   const awaiting = Math.min(active, Math.max(0, sh.required - confirmed));
   const allocated = confirmed + awaiting;
   return {
@@ -58,14 +77,14 @@ export const eventCoverage = (s: OssState, eventId: string) => sumCov(shiftsOfEv
 export const pct = (c: Coverage) => (c.required ? Math.round((c.confirmed / c.required) * 1000) / 10 : 0);
 export const pctLabel = (c: Coverage) => pct(c).toFixed(1) + "%";
 
-export function windowEvents(s: OssState, opts: { pending?: boolean; from?: string; to?: string } = {}): EventBooking[] {
+export function windowEvents(s: OssState, opts: { pending?: boolean; from?: string; to?: string; desk?: string } = {}): EventBooking[] {
   const from = opts.from || WINDOW.from, to = opts.to || WINDOW.to;
   return s.events
-    .filter((e) => !e.historical && e.date >= from && e.date <= to)
+    .filter((e) => !e.historical && e.date >= from && e.date <= to && (!opts.desk || (e.desk || "Dublin events desk") === opts.desk))
     .filter((e) => (opts.pending ? e.status === "pending" : e.status === "confirmed"))
     .sort((a, b) => (a.date + a.id).localeCompare(b.date + b.id));
 }
-export function windowTotals(s: OssState, opts: { pending?: boolean; from?: string; to?: string } = {}) {
+export function windowTotals(s: OssState, opts: { pending?: boolean; from?: string; to?: string; desk?: string } = {}) {
   const events = windowEvents(s, opts);
   const cov = sumCov(events.map((e) => eventCoverage(s, e.id)));
   return { events, ...cov, coverage: pct(cov), coverageLabel: pctLabel(cov) };
@@ -75,7 +94,7 @@ export function pendingDemand(s: OssState) {
   return { events, positions: events.reduce((n, e) => n + (e.indicativePositions || 0), 0) };
 }
 export function windowLabel(s: OssState): string {
-  const range = fmtDayMonth(zoned(WINDOW.from, "12:00")).replace(/ .*/, "") + "–" + fmtDayMonth(zoned(WINDOW.to, "12:00"));
+  const range = fmtDayMonth(zoned(WINDOW.from, "12:00")).replace(/ .*/, "") + "-" + fmtDayMonth(zoned(WINDOW.to, "12:00"));
   return (dayKey(s.clock) === WINDOW.from ? "Next seven days · " : "Demo reporting window · ") + range;
 }
 export function eventPhase(s: OssState, e: EventBooking): "upcoming" | "live" | "completed" {
@@ -92,7 +111,7 @@ const localMin = (iso: string) => toMin(fmtTime(iso));
 
 export type Avail = "available" | "unavailable" | "unknown";
 export function availability(s: OssState, workerId: string, start: string, end: string): { state: Avail; detail: string } {
-  const exs = s.availExceptions.filter((x) => x.workerId === workerId);
+  const exs = rowsBy(s.availExceptions, "worker", (x) => x.workerId, workerId);
   const block = exs.find((x) => (x.kind === "unavailable" || x.kind === "holiday") && ms(x.start) < ms(end) && ms(x.end) > ms(start));
   if (block) return { state: "unavailable", detail: (block.kind === "holiday" ? "Holiday: " : "Unavailable: ") + (block.note || fmtDayMonth(block.start)) };
   const cover = exs.find((x) => x.kind === "available" && ms(x.start) <= ms(start) && ms(x.end) >= ms(end));
@@ -101,17 +120,17 @@ export function availability(s: OssState, workerId: string, start: string, end: 
   const sMin = localMin(start);
   let eMin = localMin(end);
   if (dayKey(end) !== dayKey(start)) eMin = 24 * 60;
-  const rule = s.availRules.find((r) => r.workerId === workerId && r.weekday === wd && toMin(r.start) <= sMin && (toMin(r.end) >= eMin || (r.end === "23:59" && eMin >= 23 * 60 + 59)));
+  const rule = rowsBy(s.availRules, "worker", (r) => r.workerId, workerId).find((r) => r.weekday === wd && toMin(r.start) <= sMin && (toMin(r.end) >= eMin || (r.end === "23:59" && eMin >= 23 * 60 + 59)));
   if (rule) return { state: "available", detail: "Recurring " + ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][wd] + " " + rule.start + " to " + rule.end };
   return { state: "unknown", detail: "No availability recorded for this time" };
 }
 export const hasSubmittedAvailability = (s: OssState, workerId: string) =>
-  s.availRules.some((r) => r.workerId === workerId) || s.availExceptions.some((x) => x.workerId === workerId && !/^Confirmed availability/.test(x.note || ""));
+  rowsBy(s.availRules, "worker", (r) => r.workerId, workerId).length > 0 || rowsBy(s.availExceptions, "worker", (x) => x.workerId, workerId).some((x) => !/^Confirmed availability/.test(x.note || ""));
 
 export type DocState = "valid" | "expiring" | "expired" | "pending" | "missing" | "rejected";
 export const docEnd = (d: WorkerDocument) => zoned(addDays(d.expires, 1), "00:00");
 export function docState(s: OssState, workerId: string, type: DocType, at: string): { state: DocState; doc?: WorkerDocument; label: string } {
-  const docs = s.documents.filter((d) => d.workerId === workerId && d.type === type).sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+  const docs = rowsBy(s.documents, "worker", (d) => d.workerId, workerId).filter((d) => d.type === type).sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
   const approved = docs.filter((d) => d.review === "approved").sort((a, b) => b.expires.localeCompare(a.expires))[0];
   const pending = docs.find((d) => d.review === "pending");
   if (approved && ms(docEnd(approved)) >= ms(at)) {
@@ -135,8 +154,8 @@ export function docStatusToday(s: OssState, d: WorkerDocument): DocState {
 export function conflicts(s: OssState, workerId: string, sh: Shift): { shift: Shift; reason: string }[] {
   const out: { shift: Shift; reason: string }[] = [];
   const myVenue = eventOf(s, sh.eventId).venueId;
-  for (const a of s.assignments) {
-    if (a.workerId !== workerId || a.status !== "confirmed" || a.shiftId === sh.id) continue;
+  for (const a of asgByWorker(s, workerId)) {
+    if (a.status !== "confirmed" || a.shiftId === sh.id) continue;
     const other = shiftOf(s, a.shiftId);
     const sameVenue = eventOf(s, other.eventId).venueId === myVenue;
     const buf = sameVenue ? 0 : s.rules.travelBufferMin;
@@ -173,8 +192,8 @@ export function candidates(s: OssState, shiftId: string): { eligible: Candidate[
   const sh = shiftOf(s, shiftId);
   const venue = venueOf(s, eventOf(s, sh.eventId).venueId);
   const taken = new Set(
-    s.assignments.filter((a) => a.shiftId === shiftId && a.status === "confirmed").map((a) => a.workerId)
-      .concat(s.invitations.filter((i) => i.shiftId === shiftId && isActiveInvite(s, i)).map((i) => i.workerId))
+    asgByShift(s, shiftId).filter((a) => a.status === "confirmed").map((a) => a.workerId)
+      .concat(invByShift(s, shiftId).filter((i) => isActiveInvite(s, i)).map((i) => i.workerId))
   );
   const out = { eligible: [] as Candidate[], unknown: [] as Candidate[], blocked: [] as Candidate[] };
   for (const w of s.workers) {
@@ -182,14 +201,14 @@ export function candidates(s: OssState, shiftId: string): { eligible: Candidate[
     if (!w.roles.some((r) => sh.roles.includes(r))) continue;
     const elig = eligibility(s, w.id, shiftId);
     const venueHistory = !!venue && w.priorVenues.includes(venue.name);
-    const upcoming = s.assignments.filter((a) => a.workerId === w.id && a.status === "confirmed" && ms(shiftOf(s, a.shiftId).start) > ms(s.clock)).length;
+    const upcoming = asgByWorker(s, w.id).filter((a) => a.status === "confirmed" && ms(shiftOf(s, a.shiftId).start) > ms(s.clock)).length;
     const sb = s.standby.find((b) => b.shiftId === shiftId && b.workerId === w.id);
     // Standby workers are the fallback: they rank below fresh candidates here and are
     // used in order from the Replacements queue instead.
     const sbElsewhere = s.standby.some((b) => b.workerId === w.id && b.shiftId !== shiftId && shiftOf(s, b.shiftId).eventId === sh.eventId);
     const day = dayKey(sh.start);
-    const sameDay = s.assignments.some((a) => a.workerId === w.id && a.status === "confirmed" && dayKey(shiftOf(s, a.shiftId).start) === day)
-      || s.invitations.some((i) => i.workerId === w.id && isActiveInvite(s, i) && dayKey(shiftOf(s, i.shiftId).start) === day);
+    const sameDay = asgByWorker(s, w.id).some((a) => a.status === "confirmed" && dayKey(shiftOf(s, a.shiftId).start) === day)
+      || rowsBy(s.invitations, "worker", (i) => i.workerId, w.id).some((i) => isActiveInvite(s, i) && dayKey(shiftOf(s, i.shiftId).start) === day);
     const score = (venueHistory ? 30 : 0) - upcoming * 5 + Math.min(20, w.priorShifts / 2) - (sb ? 20 : 0) - (sbElsewhere ? 25 : 0) - (sameDay ? 12 : 0);
     const c: Candidate = { worker: w, elig, score, venueHistory, upcoming, standby: sb?.order };
     if (elig.status === "eligible" || elig.status === "warning") out.eligible.push(c);
@@ -202,11 +221,11 @@ export function candidates(s: OssState, shiftId: string): { eligible: Candidate[
 }
 
 /* ── attendance ──────────────────────────────────────────────────────────── */
-export const clocksOf = (s: OssState, asgId: string) => s.clocks.filter((c) => c.assignmentId === asgId).sort((a, b) => a.at.localeCompare(b.at));
+export const clocksOf = (s: OssState, asgId: string) => perAsg(s.clocks, asgId).slice().sort((a, b) => a.at.localeCompare(b.at));
 export const verifiedIn = (s: OssState, asgId: string): ClockEntry | undefined => clocksOf(s, asgId).find((c) => c.kind === "in" && c.result === "verified");
 export const verifiedOut = (s: OssState, asgId: string): ClockEntry | undefined => clocksOf(s, asgId).filter((c) => c.kind === "out" && c.result === "verified").pop();
-export const journeyOf = (s: OssState, asgId: string) => s.journeys.filter((j) => j.assignmentId === asgId).sort((a, b) => a.at.localeCompare(b.at)).pop();
-export const openExceptions = (s: OssState, asgId?: string): AttendanceException[] => s.exceptions.filter((e) => e.status === "open" && (!asgId || e.assignmentId === asgId));
+export const journeyOf = (s: OssState, asgId: string) => perAsg(s.journeys, asgId).slice().sort((a, b) => a.at.localeCompare(b.at)).pop();
+export const openExceptions = (s: OssState, asgId?: string): AttendanceException[] => (asgId ? perAsg(s.exceptions, asgId) : s.exceptions).filter((e) => e.status === "open");
 
 export function arrivalState(s: OssState, asgId: string): "Not reported" | "On the way" | "Running late" | "On site" | "Issue reported" {
   const j = journeyOf(s, asgId);
@@ -239,7 +258,7 @@ export function lineFor(s: OssState, asg: Assignment): Line | null {
   if (ms(s.clock) < ms(sh.start) && !cl.length) return null;
   const ev = eventOf(s, sh.eventId);
   const vin = verifiedIn(s, asg.id), vout = verifiedOut(s, asg.id);
-  const corr = s.corrections.filter((c) => c.assignmentId === asg.id);
+  const corr = perAsg(s.corrections, asg.id);
   const appIn = corr.filter((c) => c.field === "in" && c.status === "approved").pop();
   const appOut = corr.filter((c) => c.field === "out" && c.status === "approved").pop();
   const approvedStart = appIn?.proposed || vin?.at;
@@ -248,10 +267,11 @@ export function lineFor(s: OssState, asg: Assignment): Line | null {
   const breakMin = complete ? s.rules.breakMin : 0;
   const workedMin = complete ? Math.max(0, minutesBetween(approvedStart!, approvedEnd!) - breakMin) : 0;
   const topupMin = complete && s.rules.minimumOn ? Math.max(0, s.rules.minimumMin - workedMin) : 0;
-  const reopens = s.approvals.filter((a) => a.assignmentId === asg.id && a.status === "reopened").length;
+  const apps = perAsg(s.approvals, asg.id);
+  const reopens = apps.filter((a) => a.status === "reopened").length;
   const version = 1 + corr.filter((c) => c.status === "approved").length + reopens;
-  const approval = s.approvals.find((a) => a.assignmentId === asg.id && a.version === version && a.status === "approved");
-  const item = s.items.filter((i) => i.assignmentId === asg.id && i.version === version).pop();
+  const approval = apps.find((a) => a.version === version && a.status === "approved");
+  const item = perAsg(s.items, asg.id).filter((i) => i.version === version).pop();
   const pendingCorrection = corr.some((c) => c.status === "proposed");
   let status: LineStatus;
   if (!complete) status = ms(s.clock) < ms(sh.end) + s.rules.missedClockMin * 60000 && !!vin ? "in_progress" : "incomplete";
@@ -259,7 +279,7 @@ export function lineFor(s: OssState, asg: Assignment): Line | null {
   else if (approval) status = "approved";
   else if (pendingCorrection || openExceptions(s, asg.id).length) status = "needs_review";
   else status = "ready";
-  const m = s.mappings.find((x) => x.entityType === "worker" && x.localId === asg.workerId);
+  const m = rowsBy(s.mappings, "local", (x) => x.localId, asg.workerId).find((x) => x.entityType === "worker");
   return {
     id: "TS-" + asg.id, asg, worker: worker(s, asg.workerId), shift: sh, event: ev, workDate: dayKey(sh.start),
     scheduledMin: minutesBetween(sh.start, sh.end), rawIn: vin?.at, rawOut: vout?.at, approvedStart, approvedEnd,
@@ -295,7 +315,7 @@ export function totals(ls: Line[]) {
 
 /* ── handover ────────────────────────────────────────────────────────────── */
 export function batchSummary(s: OssState, batchId: string) {
-  const items = s.items.filter((i) => i.batchId === batchId);
+  const items = rowsBy(s.items, "batch", (i) => i.batchId, batchId);
   const by = (st: HandoverItem["state"]) => items.filter((i) => i.state === st);
   const mins = (l: HandoverItem[]) => l.reduce((n, i) => n + i.snapshot.payableMin, 0);
   return { items, accepted: by("accepted").length, blocked: by("blocked").length, queued: by("queued").length, failed: by("failed").length,
@@ -328,4 +348,21 @@ export function uniqueWorkers(s: OssState, eventIds: string[]) {
 export function heroStory(s: OssState) {
   const c = eventCoverage(s, "EVT-001");
   return { cov: c, setup: shiftCoverage(s, "SH-001A"), evening: shiftCoverage(s, "SH-001B") };
+}
+
+/* ── kinds, regions, days ────────────────────────────────────────────────── */
+export const KINDS: EventKind[] = ["Concert", "Sport", "Corporate", "Conference", "Festival", "Exhibition"];
+export const REGIONS: Region[] = ["Dublin", "Leinster", "Munster", "Connacht", "Ulster"];
+const SECTOR_KIND: [RegExp, EventKind][] = [[/music|concert|promot/i, "Concert"], [/sport|stadium/i, "Sport"], [/conference|production/i, "Conference"], [/festival/i, "Festival"], [/exhibit/i, "Exhibition"]];
+export function kindOf(s: OssState, e: EventBooking): EventKind {
+  if (e.kind) return e.kind;
+  const sector = s.clients.find((c) => c.id === e.clientId)?.sector || "";
+  return SECTOR_KIND.find(([re]) => re.test(sector))?.[1] || "Corporate";
+}
+export const regionOf = (s: OssState, e: EventBooking): Region => venueOf(s, e.venueId)?.region || "Dublin";
+export const deskOf = (e: EventBooking) => e.desk || "Dublin events desk";
+/** Firm events with a shift touching the given Dublin calendar day (YYYY-MM-DD). */
+export function eventsOnDay(s: OssState, day: string): EventBooking[] {
+  return s.events.filter((e) => e.status === "confirmed" && !e.historical && shiftsOfEvent(s, e.id).some((x) => dayKey(x.start) === day || dayKey(x.end) === day))
+    .sort((a, b) => ms(shiftsOfEvent(s, a.id)[0]?.start || a.date) - ms(shiftsOfEvent(s, b.id)[0]?.start || b.date));
 }

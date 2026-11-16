@@ -12,11 +12,11 @@ import { lines } from "./selectors";
 import { zoned } from "./time";
 
 export const STAGES = [
-  { n: 1, name: "Thursday planning", detail: "Canonical opening snapshot, Thu 12 Nov 16:00." },
-  { n: 2, name: "Roster filled", detail: "Aidan's split answers, Sean, Leah, Adam and Sofia accepted. Thu 12 Nov 19:30." },
-  { n: 3, name: "Event day", detail: "Saturday 15:30: set-up finished, evening crew due at 17:00. Chloé about to cancel." },
-  { n: 4, name: "Hours review", detail: "Sunday 08:30: evening complete. Niamh's checkout missing; Owen late; Brian past midnight." },
-  { n: 5, name: "Approved & handed over", detail: "Sunday 09:45: correction approved, 30 lines approved and sent, Jamie's row retried." }
+  { n: 1, name: "The booking call", detail: "Thu 12 Nov, 16:00. Aiken need 10 for set-up and 20 for the event at 3Arena on Saturday." },
+  { n: 2, name: "Roster filled", detail: "Thu 12 Nov, 19:30. Aidan splits his answer, Sean, Leah, Adam and Sofia accept." },
+  { n: 3, name: "Event day", detail: "Sat 14 Nov, 15:30. Set-up done, event crew due at 17:00." },
+  { n: 4, name: "Morning after", detail: "Sun 15 Nov, 08:30. One missing clock-out, one late arrival, one shift past midnight." },
+  { n: 5, name: "Hours to Bullhorn", detail: "Sun 15 Nov, 09:45. Correction approved, 30 lines approved and handed over." }
 ];
 
 const T = zoned;
@@ -46,7 +46,7 @@ function stage2(d: OssState) {
 function stage3(d: OssState) {
   stage2(d);
   at(d, "2026-11-13", "10:00", "U02");
-  must(confirmMeetingPoint(d, "V01", "OSS supervisor at the loading access. Mark Walsh confirms the gate with the venue on the day (sample)."), "meeting point");
+  must(confirmMeetingPoint(d, "V01", "Staff entrance at the loading bay, Gate C. Ask for Mark Walsh."), "meeting point");
   must(simulateClockIns(d, "SH-003A"), "nac in");
   must(simulateClockIns(d, "SH-004A"), "gsh in");
   must(simulateClockOuts(d, "SH-003A"), "nac out");

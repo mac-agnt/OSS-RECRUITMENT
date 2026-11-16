@@ -4,6 +4,7 @@
 import type { OssState } from "./model";
 import * as Q from "./selectors";
 import { docLabel } from "./seed";
+import { profile, stamp2Check, STAMP2_CAP_MIN } from "./industry";
 import { fmtDate, fmtDayMonth, fmtHM, fmtTime, zoned } from "./time";
 
 export interface Go { page: string; tab?: string; focus?: { kind: string; id: string } | null; drawer?: { kind: string; id: string } }
@@ -12,15 +13,19 @@ export interface Answer { text: string; tool: string; effect: "read" | "write"; 
 export const SEEDED_QUESTIONS = [
   "What needs attention before Saturday?",
   "Who can cover the 3Arena evening shift?",
-  "Why is Eoin unavailable for this shift?",
-  "Which hours haven't reached Bullhorn?"
+  "Which Stamp 2 students are close to 20 hours?",
+  "Who hasn't answered their offer yet?",
+  "Which hours haven't reached Bullhorn?",
+  "Why is Eoin unavailable for this shift?"
 ];
 
 export function briefing(s: OssState): string {
   const h = Q.eventCoverage(s, "EVT-001"), t = Q.windowTotals(s);
+  const desks = new Set(t.events.map((e) => Q.deskOf(e))).size;
   const parts = [
+    "Across " + desks + " desks this week, " + t.events.length + " events need " + t.required.toLocaleString("en-IE") + " positions and " + t.coverageLabel + " are confirmed.",
     "Saturday's 3Arena booking has " + h.confirmed + " of " + h.required + " positions confirmed." + (h.awaiting ? " " + words(h.awaiting) + " invitation" + (h.awaiting > 1 ? "s are" : " is") + " awaiting a reply." : ""),
-    "Across the " + (Q.windowLabel(s).startsWith("Next") ? "next seven days" : "reporting window") + ", " + t.unfilled + " position" + (t.unfilled === 1 ? "" : "s") + " remain" + (t.unfilled === 1 ? "s" : "") + " unfilled."
+    "Company-wide, " + t.unfilled + " position" + (t.unfilled === 1 ? "" : "s") + " remain" + (t.unfilled === 1 ? "s" : "") + " unfilled in the " + (Q.windowLabel(s).startsWith("Next") ? "next seven days" : "reporting window") + "."
   ];
   const blocked = s.items.filter((i) => i.state === "blocked");
   if (blocked.length) parts.push(blocked.map((i) => Q.nameOf(s, i.snapshot.workerId) + "'s " + words(i.snapshot.payableMin / 60).toLowerCase() + " approved hours are blocked by a missing Bullhorn mapping.").join(" "));
@@ -38,6 +43,8 @@ function words(n: number) { return Number.isInteger(n) && n < W.length ? (n === 
 export function answer(q: string, s: OssState): Answer {
   const t = q.toLowerCase();
   if (/attention|before saturday|what matters|today|briefing|what changed/.test(t)) return attention(s);
+  if (/stamp 2|student|20 hours|hours cap/.test(t)) return stamp2(s);
+  if (/hasn't answered|not answered|no reply|waiting.*(reply|answer)|outstanding/.test(t)) return noReply(s);
   if (/cover|who can|replace|evening shift|available for/.test(t)) return cover(s);
   if (/eoin|why.*(unavailable|excluded|blocked)|eligib/.test(t)) return why(s, /tomas/.test(t) ? "W035" : /maeve/.test(t) ? "W034" : "W033");
   if (/bullhorn|handover|hours.*(reach|sent)|blocked hours|jamie/.test(t)) return handover(s);
@@ -45,7 +52,7 @@ export function answer(q: string, s: OssState): Answer {
   if (/coverage|unfilled|positions|gap/.test(t)) return attention(s);
   return {
     tool: "pulse_search", effect: "read",
-    text: "I can only answer from the sample records in this demo: bookings, rosters, availability, documents, attendance, hours and the simulated Bullhorn handover. I don't have anything that answers that question, and I won't guess. Try one of the questions below, or search the records.",
+    text: "I answer from OSS Pulse records: bookings, rosters, availability, documents, attendance, hours and the Bullhorn handover. I don't have anything that answers that question, and I won't guess. Try one of the questions below, or search the records.",
     actions: [{ label: "What needs attention before Saturday?", primary: true, ask: "What needs attention before Saturday?" }, { label: "Search records", primary: false, go: { page: "Records", tab: "directory" } }]
   };
 }
@@ -119,8 +126,28 @@ function hours(s: OssState): Answer {
     text: "3Arena has " + ls.length + " lines. Worked " + fmtHM(t.worked) + (t.incomplete ? " on the " + t.complete + " complete lines" : "") + ", payable " + fmtHM(t.payable) + " including a " + fmtHM(t.topup) + " minimum top-up; " + fmtHM(t.extra) + " past scheduled finish is flagged for review. "
       + (inc.length ? inc.map((l) => l.worker.name + "'s clock-" + (l.rawIn ? "out" : "in") + " is missing").join("; ") + ", so " + (inc.length > 1 ? "those lines stay" : "that line stays") + " out of the final total until a correction is approved." : "All lines are complete."),
     cols: ["Worker", "Worked", "Payable", "Note"],
-    rows: ls.filter((l) => l.topupMin || l.extraMin || !l.complete || l.correctionNote).map((l) => [l.worker.name, l.complete ? fmtHM(l.workedMin) : "—", l.complete ? fmtHM(l.payableMin) : "—", !l.complete ? "Missing clock" : l.correctionNote ? "Corrected" : l.topupMin ? "Minimum top-up" : "Past finish " + fmtHM(l.extraMin) + (l.approvedEnd ? " (out " + fmtTime(l.approvedEnd) + ")" : "")]),
+    rows: ls.filter((l) => l.topupMin || l.extraMin || !l.complete || l.correctionNote).map((l) => [l.worker.name, l.complete ? fmtHM(l.workedMin) : "-", l.complete ? fmtHM(l.payableMin) : "-", !l.complete ? "Missing clock" : l.correctionNote ? "Corrected" : l.topupMin ? "Minimum top-up" : "Past finish " + fmtHM(l.extraMin) + (l.approvedEnd ? " (out " + fmtTime(l.approvedEnd) + ")" : "")]),
     actions: [{ label: "Corrections", primary: true, go: { page: "Timesheets", tab: "corrections" } }, { label: "Review all lines", primary: false, go: { page: "Timesheets", tab: "review", focus: { kind: "event", id: "EVT-001" } } }]
   };
 }
 export { docLabel };
+
+function stamp2(s: OssState): Answer {
+  const list = s.workers.filter((w) => profile(w).rtw.startsWith("Stamp 2")).map((w) => ({ w, c: stamp2Check(s, w.id)! })).sort((a, b) => b.c.total - a.c.total);
+  const close = list.filter((x) => x.c.total > STAMP2_CAP_MIN - 240);
+  return {
+    tool: "compliance_rtw", effect: "read",
+    text: list.length + " crew are on Stamp 2 student permission, capped at 20 hours a week in term time. " + (close.length ? close.length + " are within four hours of the cap this week; any new offer to them is checked first." : "None are close to the cap this week."),
+    cols: ["Crew", "Mon to Thu", "Booked Fri to Sun", "Week"], rows: list.slice(0, 6).map((x) => [x.w.name, fmtHM(x.c.earlier), fmtHM(x.c.booked), fmtHM(x.c.total) + " of 20h"]),
+    actions: [{ label: "Open right to work", primary: true, go: { page: "Compliance", tab: "rtw" } }]
+  };
+}
+function noReply(s: OssState): Answer {
+  const open = s.invitations.filter((i) => Q.isActiveInvite(s, i)).sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+  return {
+    tool: "staffing_responses", effect: "read",
+    text: open.length ? open.length + " offers are still open. The oldest went out " + fmtDate(open[0].sentAt) + " at " + fmtTime(open[0].sentAt) + ". Each one expires on its own and the position goes back to invite." : "Everyone has answered.",
+    cols: ["Crew", "Shift", "Sent", "Reminded"], rows: open.map((i) => [Q.nameOf(s, i.workerId), Q.eventOf(s, Q.shiftOf(s, i.shiftId).eventId).name.split(":")[0] + ", " + Q.shiftOf(s, i.shiftId).label.toLowerCase(), fmtDate(i.sentAt) + " " + fmtTime(i.sentAt), i.reminders.length ? "Yes" : "No"]),
+    actions: [{ label: "Open responses", primary: true, go: { page: "Staffing", tab: "responses" } }]
+  };
+}

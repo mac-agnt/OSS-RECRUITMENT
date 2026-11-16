@@ -3,9 +3,9 @@ import { fmtDate, fmtDateTime, fmtTime } from "../time";
 import { openDrawer } from "../store";
 import { nameOf } from "../selectors";
 
-export const when = (iso?: string) => (iso ? fmtDateTime(iso) : "—");
-export const span = (a: string, b: string) => fmtDate(a) + ", " + fmtTime(a) + "–" + fmtTime(b);
-export const hm = (a?: string) => (a ? fmtTime(a) : "—");
+export const when = (iso?: string) => (iso ? fmtDateTime(iso) : "-");
+export const span = (a: string, b: string) => fmtDate(a) + ", " + fmtTime(a) + "-" + fmtTime(b);
+export const hm = (a?: string) => (a ? fmtTime(a) : "-");
 
 /** A link that opens the canonical record drawer. */
 export function RecLink({ kind, id, children }: { kind: string; id: string; children: any }) {

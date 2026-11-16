@@ -2,6 +2,8 @@
    Deterministic: no Math.random, no real clock. Every total on every screen is
    derived from these rows. All people other than Shane Esler are fictional. */
 
+import { buildExt } from "./extSeed";
+import { buildNetwork, NET_CLIENTS, NET_CLIENT_REMOTE, NET_CONTACTS, NET_TEAMS, NET_USERS, NET_VENUES, settleNetwork } from "./network";
 import type {
   AdminUser, AgentProposal, AgentRun, Assignment, AuditEvent, AvailabilityException, AvailabilityRule, Automation,
   Client, ClientContact, ClockEntry, Decision, DocType, EventBooking, HandoverBatch, HandoverItem, IntegrationMapping,
@@ -10,7 +12,7 @@ import type {
 } from "./model";
 import { addMin, zoned } from "./time";
 
-export const SEED_VERSION = "oss-pulse-2026-11-12-v3";
+export const SEED_VERSION = "oss-pulse-2026-11-12-v9";
 export const OPENING_CLOCK = zoned("2026-11-12", "16:00");
 export const WINDOW = { from: "2026-11-12", to: "2026-11-18" };
 export const HERO_EVENT = "EVT-001";
@@ -19,7 +21,7 @@ const T = (date: string, time: string) => zoned(date, time);
 
 /* ── office personas ─────────────────────────────────────────────────────── */
 export const USERS: AdminUser[] = [
-  { id: "U01", name: "Shane Esler", role: "Director of Operations", email: "shane@ossrecruitment.ie", team: "Management", initials: "SE", known: true, perms: ["manage", "allocate", "approve_hours", "message", "handover"] },
+  { id: "U01", name: "Shane Esler", role: "Director of Operations", email: "shane@ossrecruitment.ie", team: "Management", initials: "SE", known: true, perms: ["manage", "allocate", "approve_hours", "message", "handover", "approve_docs", "edit_hours", "supervise"] },
   { id: "U02", name: "Aoife Byrne", role: "Events Manager", email: "demo.aoife@ossrecruitment.ie", team: "Events", initials: "AB", perms: ["manage", "allocate", "approve_hours", "message"] },
   { id: "U03", name: "Darragh Kelly", role: "Events Coordinator", email: "demo.darragh@ossrecruitment.ie", team: "Events", initials: "DK", perms: ["allocate", "message"] },
   { id: "U04", name: "Sarah Nolan", role: "Events Coordinator", email: "demo.sarah@ossrecruitment.ie", team: "Events", initials: "SN", perms: ["allocate", "message"] },
@@ -31,7 +33,7 @@ export const USERS: AdminUser[] = [
 
 const TEAMS: Team[] = [
   { id: "TM1", name: "Management", members: ["U01"], note: "Capacity, risk and sign-off." },
-  { id: "TM2", name: "Events", members: ["U02", "U03", "U04", "U05"], note: "The four-person events team. One further hire planned." },
+  { id: "TM2", name: "Dublin events desk", members: ["U02", "U03", "U04", "U05"], note: "Aiken, 3Arena, Aviva and the Dublin venues. Sets the standard for the other desks." },
   { id: "TM3", name: "Compliance", members: ["U06"], note: "Document review and expiry." },
   { id: "TM4", name: "Hours & payroll handover", members: ["U07"], note: "Approved hours into Bullhorn." },
   { id: "TM5", name: "Recruitment", members: ["U08"], note: "Construction and events candidates (four or five people in the real team)." }
@@ -133,26 +135,26 @@ function buildWorkers(): Worker[] {
 /* ── clients, contacts, venues ───────────────────────────────────────────── */
 const CLIENTS: Client[] = [
   { id: "C01", name: "Aiken Promotions", fictional: false, sector: "Live music promoter",
-    provenance: "Client named in the discovery call. This booking, its contacts, rates and roster are fictional sample data." },
+    provenance: "Live music promoter, regular OSS client." },
   { id: "C02", name: "Lansdowne Event Services Ltd", fictional: true, sector: "Stadium operations", provenance: "Fictional client for the demo." },
   { id: "C03", name: "National Sports Event Services Ltd", fictional: true, sector: "Sports events", provenance: "Fictional client for the demo." },
   { id: "C04", name: "Quayside Events Ltd", fictional: true, sector: "Corporate events", provenance: "Fictional client for the demo." },
   { id: "C05", name: "Dockside Production Services Ltd", fictional: true, sector: "Conference production", provenance: "Fictional client for the demo." }
 ];
 const CONTACTS: ClientContact[] = [
-  { id: "CC01", clientId: "C01", name: "Booking desk (sample persona)", role: "Sample booking contact, not a real Aiken employee", email: "bookings.sample@example.test", phone: "01 555 0140" },
-  { id: "CC02", clientId: "C02", name: "Gráinne Lacey", role: "Operations manager (fictional)", email: "grainne.lacey@example.test", phone: "01 555 0152" },
-  { id: "CC03", clientId: "C03", name: "Paul Sheridan", role: "Event lead (fictional)", email: "paul.sheridan@example.test", phone: "01 555 0161" },
-  { id: "CC04", clientId: "C04", name: "Niamh Brophy", role: "Account director (fictional)", email: "niamh.brophy@example.test", phone: "01 555 0177" },
-  { id: "CC05", clientId: "C04", name: "Ross Hayden", role: "Venue producer (fictional)", email: "ross.hayden@example.test", phone: "01 555 0178" },
-  { id: "CC06", clientId: "C05", name: "Ellen Mahon", role: "Production manager (fictional)", email: "ellen.mahon@example.test", phone: "01 555 0189" }
+  { id: "CC01", clientId: "C01", name: "Booking desk", role: "Production bookings", email: "bookings.sample@example.test", phone: "01 555 0140" },
+  { id: "CC02", clientId: "C02", name: "Gráinne Lacey", role: "Operations manager", email: "grainne.lacey@example.test", phone: "01 555 0152" },
+  { id: "CC03", clientId: "C03", name: "Paul Sheridan", role: "Event lead", email: "paul.sheridan@example.test", phone: "01 555 0161" },
+  { id: "CC04", clientId: "C04", name: "Niamh Brophy", role: "Account director", email: "niamh.brophy@example.test", phone: "01 555 0177" },
+  { id: "CC05", clientId: "C04", name: "Ross Hayden", role: "Venue producer", email: "ross.hayden@example.test", phone: "01 555 0178" },
+  { id: "CC06", clientId: "C05", name: "Ellen Mahon", role: "Production manager", email: "ellen.mahon@example.test", phone: "01 555 0189" }
 ];
 const VENUES: Venue[] = [
-  { id: "V01", name: "3Arena", area: "North Wall Quay, Dublin 1", meetingPoint: "OSS supervisor meeting point: loading access, confirm exact gate before dispatch.",
-    meetingConfirmed: false, geofenceM: 50, supervisorId: "U05", qrToken: "QR-V01-SH001B-v1", methods: ["gps", "qr"] },
-  { id: "V02", name: "Aviva Stadium", area: "Lansdowne Road, Dublin 4", meetingPoint: "Meeting point awaiting confirmation.", meetingConfirmed: false, geofenceM: 50, supervisorId: "U05", qrToken: "QR-V02-v1", methods: ["gps", "qr"] },
-  { id: "V03", name: "National Aquatic Centre", area: "Blanchardstown, Dublin 15", meetingPoint: "Staff entrance, sample instruction confirmed with client.", meetingConfirmed: true, geofenceM: 50, supervisorId: "U05", qrToken: "QR-V03-v1", methods: ["gps"] },
-  { id: "V04", name: "Guinness Storehouse", area: "St James's Gate, Dublin 8", meetingPoint: "Events entrance, sample instruction confirmed with client.", meetingConfirmed: true, geofenceM: 50, supervisorId: "U05", qrToken: "QR-V04-v1", methods: ["gps", "qr"] }
+  { id: "V01", name: "3Arena", area: "North Wall Quay, Dublin 1", meetingPoint: "Loading bay on North Wall Quay. Gate to be confirmed by the venue.",
+    meetingConfirmed: false, geofenceM: 50, supervisorId: "U05", qrToken: "QR-V01-SH001B-v1", methods: ["gps", "qr"], county: "Dublin", region: "Dublin", lat: 53.3475, lng: -6.2286, capacity: 13000 },
+  { id: "V02", name: "Aviva Stadium", area: "Lansdowne Road, Dublin 4", meetingPoint: "Meeting point awaiting confirmation.", meetingConfirmed: false, geofenceM: 50, supervisorId: "U05", qrToken: "QR-V02-v1", methods: ["gps", "qr"], county: "Dublin", region: "Dublin", lat: 53.3352, lng: -6.2285, capacity: 51700 },
+  { id: "V03", name: "National Aquatic Centre", area: "Blanchardstown, Dublin 15", meetingPoint: "Staff entrance, sample instruction confirmed with client.", meetingConfirmed: true, geofenceM: 50, supervisorId: "U05", qrToken: "QR-V03-v1", methods: ["gps"], county: "Dublin", region: "Dublin", lat: 53.399, lng: -6.361, capacity: 2500 },
+  { id: "V04", name: "Guinness Storehouse", area: "St James's Gate, Dublin 8", meetingPoint: "Events entrance, sample instruction confirmed with client.", meetingConfirmed: true, geofenceM: 50, supervisorId: "U05", qrToken: "QR-V04-v1", methods: ["gps", "qr"], county: "Dublin", region: "Dublin", lat: 53.3419, lng: -6.2867, capacity: 1600 }
 ];
 
 /* ── bookings and shifts ─────────────────────────────────────────────────── */
@@ -162,20 +164,20 @@ const EVENT_ROLES = ["Event crew", "Stagehand", "General operative", "Steward"];
 
 const EVENTS: EventBooking[] = [
   { id: "EVT-001", name: "3Arena: arena crew", clientId: "C01", venueId: "V01", date: "2026-11-14", status: "confirmed", ownerId: "U03", approverId: "U02", supervisorId: "U05",
-    ppe: PPE_HERO, createdAt: T("2026-11-06", "11:20"), sample: true,
-    brief: "Sample booking. Set-up crew in the morning, event crew in the evening. Report to the OSS supervisor; confirm the exact gate before dispatch." },
+    ppe: PPE_HERO, createdAt: T("2026-11-06", "11:20"), sample: true, kind: "Concert", desk: "Dublin events desk", audience: 12400,
+    brief: "Set-up crew in the morning to build the stage and barriers, event crew in the evening for the show. Report to the OSS supervisor at the loading bay." },
   { id: "EVT-002", name: "Aviva: stadium operations", clientId: "C02", venueId: "V02", date: "2026-11-15", status: "confirmed", ownerId: "U04", approverId: "U02", supervisorId: "U05",
-    ppe: ["High-visibility jacket", "Safety boots"], createdAt: T("2026-11-02", "09:40"), brief: "Stewarding and stadium operations crew for a fictional fixture." },
+    ppe: ["High-visibility jacket", "Safety boots"], createdAt: T("2026-11-02", "09:40"), kind: "Sport", desk: "Dublin events desk", audience: 51000, brief: "Stewarding and stadium operations crew for Sunday's fixture." },
   { id: "EVT-003", name: "National Aquatic Centre: event support", clientId: "C03", venueId: "V03", date: "2026-11-13", status: "confirmed", ownerId: "U04", approverId: "U02", supervisorId: "U05",
-    ppe: ["Non-slip footwear"], createdAt: T("2026-11-04", "14:05"), brief: "Poolside and spectator support for a fictional gala." },
+    ppe: ["Non-slip footwear"], createdAt: T("2026-11-04", "14:05"), kind: "Sport", desk: "Dublin events desk", audience: 2100, brief: "Poolside and spectator support for the gymnastics and aquatics event." },
   { id: "EVT-004", name: "Guinness Storehouse: corporate evening", clientId: "C04", venueId: "V04", date: "2026-11-13", status: "confirmed", ownerId: "U03", approverId: "U02", supervisorId: "U05",
-    ppe: ["Black uniform", "Non-slip footwear"], createdAt: T("2026-11-03", "16:30"), brief: "Catering and floor crew for a fictional corporate dinner." },
+    ppe: ["Black uniform", "Non-slip footwear"], createdAt: T("2026-11-03", "16:30"), kind: "Corporate", desk: "Dublin events desk", audience: 420, brief: "Catering and floor crew for a corporate dinner in the Gravity Bar." },
   { id: "EVT-005", name: "Winter corporate reception", clientId: "C04", venueId: "V04", date: "2026-11-20", status: "pending", ownerId: "U03", approverId: "U02", supervisorId: "U05",
-    ppe: ["Black uniform"], createdAt: T("2026-11-10", "12:10"), pendingNote: "Awaiting headcount approval from the client.", indicativePositions: 18, brief: "Indicative only." },
+    ppe: ["Black uniform"], createdAt: T("2026-11-10", "12:10"), kind: "Corporate", desk: "Dublin events desk", pendingNote: "Awaiting headcount approval from the client.", indicativePositions: 18, brief: "Indicative only." },
   { id: "EVT-006", name: "Conference build crew", clientId: "C05", venueId: null, date: "2026-11-23", status: "pending", ownerId: "U04", approverId: "U02", supervisorId: "U05",
-    ppe: ["Safety boots", "High-visibility jacket"], createdAt: T("2026-11-11", "15:45"), pendingNote: "Dates provisional; venue awaiting confirmation.", indicativePositions: 24, brief: "Indicative only." },
+    ppe: ["Safety boots", "High-visibility jacket"], createdAt: T("2026-11-11", "15:45"), kind: "Conference", desk: "Dublin events desk", pendingNote: "Dates provisional; venue awaiting confirmation.", indicativePositions: 24, brief: "Indicative only." },
   { id: "EVT-H01", name: "Storehouse corporate evening", clientId: "C04", venueId: "V04", date: "2026-11-11", status: "confirmed", ownerId: "U03", approverId: "U02", supervisorId: "U05",
-    ppe: ["Black uniform"], createdAt: T("2026-10-28", "10:00"), historical: true, brief: "Completed. Hours approved and sent in batch BH-1111-01." }
+    ppe: ["Black uniform"], createdAt: T("2026-10-28", "10:00"), historical: true, kind: "Corporate", desk: "Dublin events desk", brief: "Completed. Hours approved and sent in batch BH-1111-01." }
 ];
 
 const S = (id: string, eventId: string, label: string, roles: string[], date: string, from: string, to: string, required: number, docs: DocType[], ppe: string[]): Shift => {
@@ -341,7 +343,7 @@ export function mappingFor(workerId: string): string | null {
   if (workerId === "W052") return null;
   return "BH-CAND-" + (40210 + Number(workerId.slice(1)) * 7);
 }
-export const CLIENT_REMOTE: Record<string, string | null> = { C01: "BH-CORP-2210", C02: "BH-CORP-2231", C03: "BH-CORP-2247", C04: "BH-CORP-2252", C05: null };
+export const CLIENT_REMOTE: Record<string, string | null> = { C01: "BH-CORP-2210", C02: "BH-CORP-2231", C03: "BH-CORP-2247", C04: "BH-CORP-2252", C05: null, ...NET_CLIENT_REMOTE };
 
 function buildMappings(workers: Worker[]): IntegrationMapping[] {
   const m: IntegrationMapping[] = workers.map((w) => ({
@@ -365,13 +367,13 @@ function buildComms(): { threads: Thread[]; messages: Message[] } {
   const rc = (ids: string[], at: string, readAll = true) => Object.fromEntries(ids.map((w, k) => [w, { delivered: at, read: readAll || k % 3 ? addMin(at, 30 + k) : undefined }]));
   const messages: Message[] = [
     { id: "MSG-0001", threadId: "TH-W009", from: { kind: "office", id: "U03" }, kind: "invitation", at: T("2026-11-11", "15:20"), recipients: ["W009"],
-      body: "3Arena, Saturday 14 Nov, 08:00–13:00. Safety boots, hi-vis and gloves required. Please accept or decline this shift.",
+      body: "3Arena, Saturday 14 Nov, 08:00-13:00. Safety boots, hi-vis and gloves required. Please accept or decline this shift.",
       receipts: { W009: { delivered: T("2026-11-11", "15:20"), read: T("2026-11-11", "18:02") } }, related: { type: "invitation", id: "INV-001A-W009" } },
     { id: "MSG-0002", threadId: "TH-W009", from: { kind: "office", id: "U03" }, kind: "invitation", at: T("2026-11-11", "15:21"), recipients: ["W009"],
-      body: "3Arena, Saturday 14 Nov, 17:00–23:00. Safety boots, hi-vis and gloves required. Please accept or decline this shift.",
+      body: "3Arena, Saturday 14 Nov, 17:00-23:00. Safety boots, hi-vis and gloves required. Please accept or decline this shift.",
       receipts: { W009: { delivered: T("2026-11-11", "15:21"), read: T("2026-11-11", "18:02") } }, related: { type: "invitation", id: "INV-001B-W009" } },
     { id: "MSG-0003", threadId: "TH-W028", from: { kind: "office", id: "U03" }, kind: "invitation", at: T("2026-11-12", "11:05"), recipients: ["W028"],
-      body: "3Arena, Saturday 14 Nov, 17:00–23:00. Safety boots, hi-vis and gloves required. Please accept or decline this shift.",
+      body: "3Arena, Saturday 14 Nov, 17:00-23:00. Safety boots, hi-vis and gloves required. Please accept or decline this shift.",
       receipts: { W028: { delivered: T("2026-11-12", "11:05") } }, related: { type: "invitation", id: "INV-001B-W028" } },
     { id: "MSG-0004", threadId: "TH-EVT-001", from: { kind: "office", id: "U03" }, kind: "event", at: T("2026-11-10", "17:30"), recipients: evtCrew, audience: "Confirmed crew, 3Arena",
       body: "Thanks for confirming Saturday at 3Arena. Full brief and meeting point to follow once the gate is confirmed.", receipts: rc(evtCrew, T("2026-11-10", "17:30"), false) },
@@ -480,16 +482,16 @@ function buildAudit(): AuditEvent[] {
   const A = (at: string, actor: string, action: string, type: string, id: string, label: string, summary: string, category: AuditEvent["category"], result: AuditEvent["result"] = "ok", story?: AuditEvent["story"]): AuditEvent =>
     ({ id: "", at, actor, action, entity: { type, id, label }, summary, category, result, story });
   const list = [
-    A(T("2026-11-06", "11:20"), "Darragh Kelly", "booking.created", "event", "EVT-001", "3Arena: arena crew", "Created booking EVT-001 for Aiken Promotions (sample): two shifts, 30 positions", "operations", "ok", "A"),
+    A(T("2026-11-06", "11:20"), "Darragh Kelly", "booking.created", "event", "EVT-001", "3Arena: arena crew", "Created the 3Arena booking for Aiken Promotions: two shifts, 30 positions", "operations", "ok", "A"),
     A(T("2026-11-09", "10:00"), "Darragh Kelly", "invitations.sent", "shift", "SH-001B", "Event crew", "Sent 17 individual invitations for 3Arena event crew", "operations", "ok", "A"),
     A(T("2026-11-10", "20:14"), "Aidan Murphy", "availability.updated", "worker", "W009", "Aidan Murphy", "Recorded Saturday 07:00 to 14:00 available", "operations"),
     A(T("2026-11-11", "15:21"), "Darragh Kelly", "invitation.sent", "invitation", "INV-001B-W009", "Aidan Murphy, event crew", "Invited Aidan to event crew with availability not confirmed (coordinator exception)", "operations", "ok", "A"),
     A(T("2026-11-11", "19:42"), "Tomas Nowak", "document.uploaded", "document", "DOC-0034", "Manual Handling", "Uploaded Manual Handling evidence; awaiting review", "approvals", "ok", "D"),
     A(T("2026-11-12", "06:00"), "Eligibility Assistant", "agent.run", "agent", "eligibility", "Eligibility Assistant", "Flagged Eoin Brennan: Manual Handling valid through 13 Nov, before Saturday's shift", "systems", "ok", "D"),
     A(T("2026-11-12", "09:40"), "Aoife Byrne", "hours.approved", "event", "EVT-H01", "Storehouse corporate evening", "Approved 12 lines, 60h, for 11 Nov", "approvals", "ok", "F"),
-    A(T("2026-11-12", "10:15"), "Emma Ryan", "handover.batch_created", "batch", "BH-1111-01", "BH-1111-01", "Created simulated Bullhorn batch with 12 approved lines", "systems", "simulated", "F"),
-    A(T("2026-11-12", "10:16"), "Bullhorn adapter (simulated)", "handover.sent", "batch", "BH-1111-01", "BH-1111-01", "Demo handover: 11 lines accepted, 55h", "systems", "simulated", "F"),
-    A(T("2026-11-12", "10:16"), "Bullhorn adapter (simulated)", "handover.blocked", "item", "HO-H-W052", "Jamie Allen, 11 Nov", "Demo handover: Jamie's five hours blocked; worker mapping required", "systems", "rejected", "F"),
+    A(T("2026-11-12", "10:15"), "Emma Ryan", "handover.batch_created", "batch", "BH-1111-01", "BH-1111-01", "Created Bullhorn send with 12 approved lines", "systems", "simulated", "F"),
+    A(T("2026-11-12", "10:16"), "Bullhorn", "handover.sent", "batch", "BH-1111-01", "Storehouse, 11 Nov", "Bullhorn accepted 11 lines, 55h", "systems", "simulated", "F"),
+    A(T("2026-11-12", "10:16"), "Bullhorn", "handover.blocked", "item", "HO-H-W052", "Jamie Allen, 11 Nov", "Jamie Allen's five hours blocked: no Bullhorn candidate match", "systems", "rejected", "F"),
     A(T("2026-11-12", "11:05"), "Darragh Kelly", "invitation.sent", "invitation", "INV-001B-W028", "Sean McKenna, event crew", "Invited Sean McKenna to 3Arena event crew", "operations", "ok", "A"),
     A(T("2026-11-12", "15:40"), "Staffing Assistant", "agent.proposal", "agent", "staffing", "Staffing Assistant", "Proposed invitations for Leah Byrne, Adam O'Neill and Sofia Costa; waiting for a coordinator", "systems")
   ];
@@ -514,7 +516,7 @@ function buildBatch(assignments: Assignment[], approvals: TimesheetApproval[]): 
       state: mapped ? "accepted" : "blocked",
       receipt: mapped ? "SIM-RCPT-1111-" + String(k + 1).padStart(2, "0") : undefined,
       error: mapped ? undefined : "Worker mapping missing: no Bullhorn candidate ID for W052",
-      attempts: [{ at: T("2026-11-12", "10:16"), result: mapped ? "accepted (simulated)" : "blocked: mapping missing" }]
+      attempts: [{ at: T("2026-11-12", "10:16"), result: mapped ? "accepted" : "blocked: mapping missing" }]
     });
   });
   return { batches, items };
@@ -535,14 +537,19 @@ export function buildCanonical(): OssState {
   const { batches, items } = buildBatch(assignments, approvals);
   const { threads, messages } = buildComms();
   const { runs, proposals } = buildAgents();
-  return {
+  const net = buildNetwork(VENUES);
+  // Deep copy: actions mutate the state, and module-level seed rows must stay pristine for "start over".
+  const state: OssState = structuredClone({
     seedVersion: SEED_VERSION, clock: OPENING_CLOCK, seq: 100,
-    users: USERS, teams: TEAMS, workers, clients: CLIENTS, contacts: CONTACTS, venues: VENUES,
-    events: EVENTS, shifts: SHIFTS, documents: buildDocuments(), availRules: rules, availExceptions: ex,
-    invitations, assignments, standby: STANDBY, journeys: [], clocks, exceptions: [], corrections: [], approvals,
+    users: USERS.concat(NET_USERS), teams: TEAMS.concat(NET_TEAMS), workers: workers.concat(net.workers), clients: CLIENTS.concat(NET_CLIENTS), contacts: CONTACTS.concat(NET_CONTACTS), venues: VENUES.concat(NET_VENUES),
+    events: EVENTS.concat(net.events), shifts: SHIFTS.concat(net.shifts), documents: buildDocuments().concat(net.documents), availRules: rules.concat(net.availRules), availExceptions: ex,
+    invitations: invitations.concat(net.invitations), assignments: assignments.concat(net.assignments), standby: STANDBY, journeys: [], clocks, exceptions: [], corrections: [], approvals,
     threads, messages, tasks: buildTasks(), agentRuns: runs, proposals, agentsPaused: {},
-    mappings: buildMappings(workers), batches, items, audit: buildAudit(), programmes: PROGRAMMES, rules: { ...RULES },
-    automations: AUTOMATIONS, autoRuns: [], decisions: DECISIONS, openShiftRequests: [],
+    mappings: buildMappings(workers).concat(net.mappings), batches, items, audit: buildAudit(), programmes: PROGRAMMES, rules: { ...RULES },
+    automations: AUTOMATIONS, autoRuns: [], decisions: DECISIONS, openShiftRequests: [], ext: buildExt(),
     ui: { stage: 1, role: "office", personaId: "U01", crewWorkerId: "W009", tabs: {}, focus: null, phoneOpen: false, drawer: null, dirty: false }
-  };
+  });
+  /* The other desks have been working all day too. */
+  settleNetwork(state, OPENING_CLOCK);
+  return state;
 }

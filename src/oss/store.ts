@@ -7,6 +7,7 @@ import type { OssState, UiState } from "./model";
 import type { Result } from "./engine";
 import { SEED_VERSION } from "./seed";
 import { buildStage } from "./stages";
+import { resolveRoute } from "./modules";
 
 const KEY = "oss-pulse-demo:" + SEED_VERSION;
 const OLD_PREFIX = "oss-pulse-demo:";
@@ -66,11 +67,18 @@ export function run<A extends any[]>(fn: (d: OssState, ...args: A) => Result, ..
   const r = fn(d, ...args);
   d.ui = { ...d.ui, dirty: true };
   commit(d);
-  if (r.data?.needs) {
-    const holders = state.users.filter((u) => (u.perms as string[]).includes(r.data.needs));
-    const holder = holders.find((u) => u.id !== "U01") || holders[0];
-    toast(false, r.message, holder ? { label: "Act as " + holder.name.split(" ")[0], run: () => setUi({ personaId: holder.id }) } : undefined);
-  } else toast(r.ok, r.message);
+  toast(r.ok, r.message);
+  return r;
+}
+/** Run an action as another office user (e.g. Mark on the supervisor phone), in one commit. */
+export function runAs<A extends any[]>(personaId: string, fn: (d: OssState, ...args: A) => Result, ...args: A): Result {
+  const d: OssState = structuredClone(state);
+  const prev = d.ui.personaId;
+  d.ui.personaId = personaId;
+  const r = fn(d, ...args);
+  d.ui = { ...d.ui, personaId: prev, dirty: true };
+  commit(d);
+  toast(r.ok, r.message);
   return r;
 }
 /** Same as run, without a toast (for inline feedback). */
@@ -83,8 +91,12 @@ export function runQuiet<A extends any[]>(fn: (d: OssState, ...args: A) => Resul
 }
 
 export function setUi(patch: Partial<UiState>) { commit({ ...state, ui: { ...state.ui, ...patch } }); }
-export function setTab(page: string, tab: string) { setUi({ tabs: { ...state.ui.tabs, [page]: tab } }); }
-export function openDrawer(kind: string, id: string) { setUi({ drawer: { kind, id } }); }
+const toTop = () => { if (typeof document !== "undefined") document.querySelector("[data-scroll-main]")?.scrollTo(0, 0); };
+export function setTab(page: string, tab: string) { setUi({ tabs: { ...state.ui.tabs, [page]: tab }, focus: null }); toTop(); }
+export function openDrawer(kind: string, id: string) {
+  if (kind === "event") { navigate("Events", "upcoming", { kind: "event", id }); return; }
+  setUi({ drawer: { kind, id } });
+}
 export function closeDrawer() { setUi({ drawer: null }); }
 
 export function loadStage(n: number) {
@@ -93,18 +105,20 @@ export function loadStage(n: number) {
   next.ui = { ...next.ui, ...keep };
   commit(next);
 }
-export function resetDemo() { commit(buildStage(1)); }
+export function resetDemo() { const keep = { tabs: {} }; const next = buildStage(1); next.ui = { ...next.ui, ...keep }; commit(next); }
 
 /* navigation bridge: PulseLogic registers its page switcher here */
 let goHandler: ((page: string) => void) | null = null;
 export function registerNav(fn: (page: string) => void) { goHandler = fn; }
-export function navigate(page: string, tab?: string, focus?: { kind: string; id: string } | null) {
+export function navigate(rawPage: string, rawTab?: string, focus?: { kind: string; id: string } | null) {
+  const [page, tab] = resolveRoute(rawPage, rawTab);
   const patch: Partial<UiState> = {};
   if (tab) patch.tabs = { ...state.ui.tabs, [page]: tab };
   if (focus !== undefined) patch.focus = focus;
   patch.drawer = null;
   setUi(patch);
   goHandler?.(page);
+  toTop();
 }
 
 /* Dev-only handle for automated page sweeps; not present in production builds. */

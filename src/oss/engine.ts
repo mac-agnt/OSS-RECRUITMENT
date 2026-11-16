@@ -1,6 +1,7 @@
 /* Actions. Each one mutates a draft copy of the state, records an audit event
    and returns a result the UI can show. Rejections are recorded as rejections. */
 
+import { settleNetwork } from "./network";
 import type {
   AgentProposal, AgentRun, AuditEvent, AvailabilityException, AvailabilityRule, ClockEntry, DocType, EventBooking, ExceptionType,
   HandoverItem, Invitation, Message, OssState, Rules, Shift, StoryKey, Worker, WorkflowTask
@@ -27,7 +28,7 @@ const me = (d: OssState) => persona(d).name;
 const deny = (d: OssState, perm: string, what: string): Result => {
   const holders = d.users.filter((u) => (u.perms as string[]).includes(perm)).map((u) => u.name);
   audit(d, me(d), "permission.denied", { type: "permission", id: perm, label: what }, me(d) + " tried to " + what + "; not permitted in the demo role model", "approvals", "rejected");
-  return no("Needs " + holders.join(" or ") + " in this demo's role model. Use the button, or switch persona in the side panel.", { needs: perm, holders });
+  return no("Needs " + holders.join(" or ") + ".", { needs: perm, holders });
 };
 const shiftLabel = (d: OssState, sh: Shift) => eventOf(d, sh.eventId).name + ", " + sh.label.toLowerCase();
 const storyOf = (sh: Shift): StoryKey | undefined => (sh.eventId === "EVT-001" ? "A" : undefined);
@@ -59,8 +60,8 @@ export function sendBulk(d: OssState, args: { workerIds: string[]; body: string;
   } else if (args.workerIds.length === 1) threadId = threadFor(d, args.workerIds[0]).id;
   else { threadId = "TH-BULK"; if (!d.threads.find((t) => t.id === threadId)) d.threads.push({ id: threadId, kind: "event", title: "Bulk messages" }); }
   const msg = postMessage(d, { threadId, kind: args.kind || (args.workerIds.length > 1 ? "bulk" : "direct"), body: args.body.trim(), recipients: args.workerIds, audience: args.audience });
-  audit(d, me(d), "message.sent", { type: "message", id: msg.id, label: args.audience }, "Sent a simulated in-app message to " + args.workerIds.length + (args.workerIds.length === 1 ? " person" : " people") + " (" + args.audience + ")", "operations", "simulated");
-  return ok("Message delivered in-app to " + args.workerIds.length + (args.workerIds.length === 1 ? " person" : " people") + ". Simulated: no SMS, push or email sent.", { id: msg.id });
+  audit(d, me(d), "message.sent", { type: "message", id: msg.id, label: args.audience }, "Messaged " + args.workerIds.length + (args.workerIds.length === 1 ? " person" : " people") + " (" + args.audience + ")", "operations", "simulated");
+  return ok("Sent to " + args.workerIds.length + (args.workerIds.length === 1 ? " person" : " people") + " in OSS Crew.", { id: msg.id });
 }
 export function markRead(d: OssState, workerId: string, messageIds: string[]): Result {
   for (const m of d.messages) if (messageIds.includes(m.id) && m.receipts[workerId] && !m.receipts[workerId].read) m.receipts[workerId].read = d.clock;
@@ -156,7 +157,7 @@ export function requestAvailability(d: OssState, shiftId: string, workerIds: str
 /* ── invitations ─────────────────────────────────────────────────────────── */
 export const inviteBody = (d: OssState, sh: Shift) =>
   (venueOf(d, eventOf(d, sh.eventId).venueId)?.name || eventOf(d, sh.eventId).name) + ", " + fmtDate(sh.start).replace(/^(\w+)/, (m) => ({ Sat: "Saturday", Sun: "Sunday", Fri: "Friday", Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday" } as any)[m] || m)
-  + ", " + fmtTime(sh.start) + "–" + fmtTime(sh.end) + ". " + (sh.ppe.length ? sh.ppe.join(", ").replace("High-visibility jacket", "hi-vis").replace(/, ([^,]*)$/, " and $1").replace(/^./, (c) => c.toUpperCase()) + " required. " : "") + "Please accept or decline this shift.";
+  + ", " + fmtTime(sh.start) + "-" + fmtTime(sh.end) + ". " + (sh.ppe.length ? sh.ppe.join(", ").replace("High-visibility jacket", "hi-vis").replace(/, ([^,]*)$/, " and $1").replace(/^./, (c) => c.toUpperCase()) + " required. " : "") + "Please accept or decline this shift.";
 
 export function sendInvitations(d: OssState, shiftId: string, workerIds: string[], opts: { kind?: "standard" | "replacement"; replaces?: string; actor?: string } = {}): Result {
   if (!can(d, "allocate")) return deny(d, "allocate", "send invitations");
@@ -182,7 +183,7 @@ export function sendInvitations(d: OssState, shiftId: string, workerIds: string[
     postMessage(d, { threadId: threadFor(d, w).id, kind: "invitation", recipients: [w], body: inviteBody(d, sh), related: { type: "invitation", id: inv.id } });
     sent.push(name);
     audit(d, opts.actor || me(d), "invitation.sent", { type: "invitation", id: inv.id, label: name + ", " + sh.label.toLowerCase() },
-      (opts.kind === "replacement" ? "Sent replacement invitation to " : "Invited ") + name + " to " + shiftLabel(d, sh) + " (simulated in-app delivery)", "operations", "simulated", opts.kind === "replacement" ? "B" : storyOf(sh));
+      (opts.kind === "replacement" ? "Sent replacement invitation to " : "Invited ") + name + " to " + shiftLabel(d, sh) + "", "operations", "simulated", opts.kind === "replacement" ? "B" : storyOf(sh));
   }
   if (!sent.length) return no(skipped.join(". ") || "Nobody to invite.", { skipped });
   return ok("Invited " + sent.join(", ") + (skipped.length ? ". Skipped: " + skipped.join("; ") : "") + ". Positions count as allocated until they reply.", { sent, skipped });
@@ -244,7 +245,7 @@ export function remind(d: OssState, invId: string): Result {
   inv.reminders.push(d.clock);
   postMessage(d, { threadId: threadFor(d, inv.workerId).id, kind: "reminder", recipients: [inv.workerId], related: { type: "invitation", id: inv.id }, body: "Reminder: please accept or decline " + shiftLabel(d, sh) + ", " + fmtDate(sh.start) + " " + fmtTime(sh.start) + ". Offer open until " + fmtDate(inv.expiresAt) + " " + fmtTime(inv.expiresAt) + "." });
   audit(d, me(d), "invitation.reminded", { type: "invitation", id: inv.id, label: nameOf(d, inv.workerId) }, "Reminded " + nameOf(d, inv.workerId) + " about " + shiftLabel(d, sh), "operations", "simulated");
-  return ok("Reminder delivered in-app (simulated).");
+  return ok("Reminder sent.");
 }
 
 /* ── cancellation, standby, replacement ──────────────────────────────────── */
@@ -261,7 +262,7 @@ export function cancelAssignment(d: OssState, asgId: string, reason: string, byW
   postMessage(d, { threadId: threadFor(d, w.id).id, kind: "cancellation", recipients: ["office"], from: { kind: "worker", id: w.id }, body: "Cancelled " + shiftLabel(d, sh) + ". Reason: " + reason.trim() });
   addTask(d, { title: "Replace " + w.name + " on " + ev.name.split(":")[0] + " " + sh.label.toLowerCase(), ownerId: ev.ownerId, due: addMin(sh.start, -60), priority: "High", dept: "Events",
     related: { type: "assignment", id: a.id, label: w.name + " cancelled" }, kind: "replacement", source: "Ops Watchdog" });
-  return ok("Cancelled. OSS has a replacement task; your history keeps this record.");
+  return ok("Cancelled. OSS has been told and will find cover.");
 }
 export function addStandby(d: OssState, shiftId: string, workerId: string): Result {
   if (!can(d, "allocate")) return deny(d, "allocate", "change standby");
@@ -327,7 +328,7 @@ export function registerWorker(d: OssState, f: { name: string; email: string; mo
     return no("Existing profile found: " + exact.name + " (" + exact.id + ").", { existing: exact.id });
   }
   if (similar.length && !confirmNew) return no("Possible name match. Review before creating.", { similar: similar.map((w) => w.id) });
-  const id = "W" + String(d.workers.length + 1).padStart(3, "0");
+  const id = "W" + String(Math.max(...d.workers.map((x) => Number(x.id.slice(1)))) + 1).padStart(3, "0");
   const w: Worker = { id, name: f.name.trim(), roles: [f.role], locality: f.locality, email: normEmail(f.email), mobile: f.mobile.trim(), joined: dayKey(d.clock), status: "pending_compliance", priorShifts: 0, priorVenues: [], registeredBy: by, registeredAt: d.clock };
   d.workers.push(w);
   d.mappings.push({ id: "MAP-" + id, entityType: "worker", localId: id, remoteId: null, status: "missing", note: "Mapping pending: new local worker" });
@@ -405,13 +406,13 @@ export function changeShiftTimes(d: OssState, shiftId: string, startHM: string, 
   let end = zoned(date, endHM);
   if (ms(end) <= ms(start)) end = addMin(end, 24 * 60);
   if (minutesBetween(start, end) > 16 * 60) return no("End must be after start (and within 16 hours).");
-  const before = fmtTime(sh.start) + "–" + fmtTime(sh.end);
+  const before = fmtTime(sh.start) + "-" + fmtTime(sh.end);
   sh.start = start; sh.end = end; sh.version += 1;
   const imp = shiftChangeImpact(d, shiftId);
   const ids = imp.accepted.map((a) => a.workerId).concat(imp.invites.map((i) => i.workerId));
   for (const i of imp.invites) i.version = sh.version;
-  for (const w of ids) postMessage(d, { threadId: threadFor(d, w).id, kind: "direct", recipients: [w], body: shiftLabel(d, sh) + " has moved to " + fmtTime(start) + "–" + fmtTime(end) + ". Please reconfirm in OSS Crew." });
-  audit(d, me(d), "shift.changed", { type: "shift", id: shiftId, label: shiftLabel(d, sh) }, "Changed " + shiftLabel(d, sh) + " times; " + imp.accepted.length + " accepted workers need to reconfirm", "operations", "ok", undefined, before, fmtTime(start) + "–" + fmtTime(end));
+  for (const w of ids) postMessage(d, { threadId: threadFor(d, w).id, kind: "direct", recipients: [w], body: shiftLabel(d, sh) + " has moved to " + fmtTime(start) + "-" + fmtTime(end) + ". Please reconfirm in OSS Crew." });
+  audit(d, me(d), "shift.changed", { type: "shift", id: shiftId, label: shiftLabel(d, sh) }, "Changed " + shiftLabel(d, sh) + " times; " + imp.accepted.length + " accepted workers need to reconfirm", "operations", "ok", undefined, before, fmtTime(start) + "-" + fmtTime(end));
   return ok("Saved. " + imp.accepted.length + " accepted workers asked to reconfirm.");
 }
 export function reconfirm(d: OssState, asgId: string): Result {
@@ -635,7 +636,7 @@ export function createBatch(d: OssState, asgIds: string[], label: string, scope:
     };
     d.items.push(item);
   }
-  audit(d, me(d), "handover.batch_created", { type: "batch", id, label: id }, "Created simulated batch " + id + " with " + ready.length + " approved lines, " + fmtHM(ready.reduce((t, l) => t + l.payableMin, 0)) + " payable", "systems", "simulated", "F");
+  audit(d, me(d), "handover.batch_created", { type: "batch", id, label: id }, "Created Bullhorn send " + id + " with " + ready.length + " approved lines, " + fmtHM(ready.reduce((t, l) => t + l.payableMin, 0)) + " payable", "systems", "simulated", "F");
   return ok("Batch " + id + " queued with " + ready.length + " lines.", { id });
 }
 function attempt(d: OssState, item: HandoverItem): string {
@@ -649,7 +650,7 @@ function attempt(d: OssState, item: HandoverItem): string {
   if (already) { item.state = "accepted"; item.receipt = already.receipt; item.attempts.push({ at: d.clock, result: "duplicate transfer key; existing receipt returned" }); return "kept"; }
   const n = d.items.filter((x) => x.batchId === item.batchId && x.receipt).length + 1;
   item.state = "accepted"; item.error = undefined; item.receipt = "SIM-RCPT-" + item.batchId.slice(3, 7) + "-" + String(n).padStart(2, "0") + (item.batchId.endsWith("01") ? "" : item.batchId.slice(-2));
-  item.attempts.push({ at: d.clock, result: "accepted (simulated)" });
+  item.attempts.push({ at: d.clock, result: "accepted" });
   return "accepted";
 }
 export function sendBatch(d: OssState, batchId: string): Result {
@@ -658,8 +659,8 @@ export function sendBatch(d: OssState, batchId: string): Result {
   if (!items.length) return no("Nothing queued in this batch.");
   items.forEach((i) => attempt(d, i));
   const s = batchSummary(d, batchId);
-  audit(d, "Bullhorn adapter (simulated)", "handover.sent", { type: "batch", id: batchId, label: batchId }, "Demo handover " + batchId + ": " + s.accepted + " accepted (" + fmtHM(s.acceptedMin) + ")" + (s.blocked ? ", " + s.blocked + " blocked (" + fmtHM(s.blockedMin) + ")" : ""), "systems", "simulated", "F");
-  return ok(s.accepted + " accepted, " + s.blocked + " blocked. Simulated receipts; nothing was paid or invoiced.");
+  audit(d, "Bullhorn", "handover.sent", { type: "batch", id: batchId, label: batchId }, "Bullhorn accepted " + batchId + ": " + s.accepted + " accepted (" + fmtHM(s.acceptedMin) + ")" + (s.blocked ? ", " + s.blocked + " blocked (" + fmtHM(s.blockedMin) + ")" : ""), "systems", "simulated", "F");
+  return ok("Sent to Bullhorn: " + s.accepted + " accepted" + (s.blocked ? ", " + s.blocked + " blocked" : "") + ".");
 }
 export function retryItems(d: OssState, itemIds: string[]): Result {
   if (!can(d, "handover")) return deny(d, "handover", "retry a handover row");
@@ -668,7 +669,7 @@ export function retryItems(d: OssState, itemIds: string[]): Result {
     const it = d.items.find((x) => x.id === id); if (!it) continue;
     const r = attempt(d, it);
     res.push(r);
-    audit(d, "Bullhorn adapter (simulated)", "handover.retry", { type: "item", id: it.id, label: nameOf(d, it.snapshot.workerId) + ", " + it.snapshot.workDate },
+    audit(d, "Bullhorn", "handover.retry", { type: "item", id: it.id, label: nameOf(d, it.snapshot.workerId) + ", " + it.snapshot.workDate },
       r === "kept" ? "Retry on accepted row " + it.transferKey + " returned existing receipt " + it.receipt + "; nothing resent" : r === "accepted" ? "Retried " + nameOf(d, it.snapshot.workerId) + "'s row: accepted, receipt " + it.receipt : "Retried " + nameOf(d, it.snapshot.workerId) + "'s row: still blocked, " + it.error,
       "systems", r === "blocked" ? "rejected" : "simulated", "F");
   }
@@ -700,7 +701,7 @@ export function runAutomations(d: OssState, from: string, to: string) {
     if (a.status !== "confirmed") continue;
     const sh = shiftOf(d, a.shiftId);
     const ev = eventOf(d, sh.eventId);
-    if (ev.historical) continue;
+    if (ev.historical || ev.network) continue;
     const w = worker(d, a.workerId);
     if (on("AU2") && inWin(ms(sh.start) - d.rules.dayBeforeH * 3600000) && once("AU2", "AU2:" + a.id + ":v" + sh.version, "Reconfirmation to " + w.name, 1))
       postMessage(d, { threadId: threadFor(d, w.id).id, kind: "reminder", recipients: [w.id], from: { kind: "system", id: "AU2" }, body: "Please reconfirm your " + fmtTime(sh.start) + " shift tomorrow. Let OSS know if your plans have changed." });
@@ -727,6 +728,7 @@ export function setClock(d: OssState, iso: string): Result {
   if (ms(iso) < ms(d.clock)) return no("Scenario time only moves forward. Load a stage to go back.");
   const from = d.clock;
   d.clock = iso;
+  settleNetwork(d, iso);
   runAutomations(d, from, iso);
   reconcileTasks(d);
   return ok("Scenario time " + fmtDate(iso) + " " + fmtTime(iso));
@@ -745,8 +747,8 @@ export function simulateClockIns(d: OssState, shiftId: string): Result {
     clock(d, a.id, { kind: "in", method: "gps", distanceM: 12 + (k * 7) % 34, accuracyM: 8 + (k % 9), at: sh.start, actor: worker(d, a.workerId).name });
     n++;
   }
-  audit(d, "Presenter", "demo.simulated", { type: "shift", id: shiftId, label: shiftLabel(d, sh) }, "Simulated " + n + " on-time GPS check-ins at " + fmtTime(sh.start) + " (presenter control)", "systems", "simulated");
-  return ok("Simulated " + n + " on-time check-ins. Anyone who reported running late was left out.");
+  audit(d, "OSS Crew", "clock.batch_in", { type: "shift", id: shiftId, label: shiftLabel(d, sh) }, n + " crew clocked in by GPS at " + fmtTime(sh.start) + ", " + shiftLabel(d, sh), "systems", "simulated");
+  return ok(n + " crew clocked in on time. Anyone running late is still to arrive.");
 }
 /** Fixture end-of-shift: Ciara leaves at 12:00, Brian at 00:00, Niamh's checkout is missing. */
 export const FIXTURE_OUT: Record<string, number | null> = { W003: -60, W012: 60, W025: null };
@@ -763,8 +765,8 @@ export function simulateClockOuts(d: OssState, shiftId: string): Result {
     setClock(d, addMin(sh.end, d.rules.missedClockMin));
     for (const a of late) out(a, FIXTURE_OUT[a.workerId] as number);
   } else setClock(d, addMin(sh.end, d.rules.missedClockMin));
-  audit(d, "Presenter", "demo.simulated", { type: "shift", id: shiftId, label: shiftLabel(d, sh) }, "Simulated end-of-shift check-outs from the sample fixture (" + (early.length + normal.length + late.length) + " recorded" + (list.some((a) => FIXTURE_OUT[a.workerId] === null) ? "; one checkout deliberately missing" : "") + ")", "systems", "simulated");
-  return ok("Recorded " + (early.length + normal.length + late.length) + " check-outs from the fixture.");
+  audit(d, "OSS Crew", "clock.batch_out", { type: "shift", id: shiftId, label: shiftLabel(d, sh) }, "End-of-shift clock-outs (" + (early.length + normal.length + late.length) + " recorded" + (list.some((a) => FIXTURE_OUT[a.workerId] === null) ? "; one checkout deliberately missing" : "") + ")", "systems", "simulated");
+  return ok((early.length + normal.length + late.length) + " crew clocked out.");
 }
 
 /* ── agents ──────────────────────────────────────────────────────────────── */
@@ -843,7 +845,7 @@ export function runAgent(d: OssState, agentId: string): Result {
   if (agentId === "handover") {
     const bl = d.items.filter((i) => i.state === "blocked");
     bl.forEach((i) => findings.push(i.batchId + ": " + nameOf(d, i.snapshot.workerId) + " blocked, " + (i.error || "") + "."));
-    if (!bl.length) findings.push("No blocked rows. Accepted receipts are simulated and do not mean payment.");
+    if (!bl.length) findings.push("No blocked rows. Every approved line is in Bullhorn.");
     evidence.push({ label: "Bullhorn handover", page: "Timesheets", tab: "handover" });
   }
   const run: AgentRun = { id: nid(d, "RUN"), agentId, at: d.clock, trigger: "run_now", findings, evidence, proposalIds };
@@ -878,7 +880,7 @@ export function setRule(d: OssState, key: keyof Rules, value: number | boolean):
   if (!can(d, "manage")) return deny(d, "manage", "change a rule");
   const before = String(d.rules[key]);
   (d.rules as any)[key] = value;
-  audit(d, me(d), "rule.changed", { type: "rule", id: key, label: key }, me(d) + " changed " + key + " from " + before + " to " + value + " (demo rule; affects this workshop only)", "systems", "ok", undefined, before, String(value));
+  audit(d, me(d), "rule.changed", { type: "rule", id: key, label: key }, me(d) + " changed " + key + " from " + before + " to " + value + "", "systems", "ok", undefined, before, String(value));
   return ok("Rule updated. Every derived number recalculates.");
 }
 export function setAutomation(d: OssState, id: string, on: boolean): Result {

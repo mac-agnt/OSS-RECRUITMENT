@@ -1,0 +1,181 @@
+/* Phone layout (below 768px). Loaded last so it can settle the template's
+   inline styles. The shell itself (nav drawer, edge-to-edge panel, compact
+   header) is driven from PulseLogic's `isMobile`; this file handles the rest. */
+
+@media (max-width:767px){
+  /* Bottom bar: the FAB no longer sits over it, so the right padding can go. */
+  .oss-bottombar{padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
+}
+
+/* ── Calendar month: a phone calendar. Each day shows its number, a dot per
+   event (colour = kind of work) and the crew heat bar; tap a day for its list. */
+@media (max-width:767px){
+  .nx-cal{gap:3px;padding:0 8px 10px}
+  .nx-cal > .cal-cell{min-height:58px;padding:5px 4px 10px;flex-direction:row;flex-wrap:wrap;align-content:flex-start;gap:3px;border-radius:10px}
+  .nx-cal .dow{font-size:8.5px;letter-spacing:.06em;text-align:center;padding:2px 0 4px}
+  .nx-cal .nx-cd{width:100%;justify-content:center;margin-bottom:1px}
+  .nx-cal .cal-d{margin:0;padding:0 2px;font-size:12px}
+  .nx-cal .cal-d::after{content:"";position:absolute;inset:0;border-radius:inherit}
+  .nx-cal .nx-evb,.nx-cal .cal-ind,.nx-cal .cal-key{flex:none;width:6px;height:6px;margin:0;padding:0;border-radius:50%;font-size:0;pointer-events:none;box-shadow:none;overflow:hidden}
+  .nx-cal .nx-evb{background:var(--k)}
+  .nx-cal .nx-evb.pending{background:none;box-shadow:inset 0 0 0 1px var(--border-strong)}
+  .nx-cal .nx-evb .t,.nx-cal .nx-evb .n,.nx-cal .cal-ind svg{display:none}
+  .nx-cal .cal-ind{background:var(--ok)}
+  .nx-cal .cal-key{background:var(--dim)}
+  .nx-cal .cal-key.urgent{background:#F6881F}
+  .nx-cal .nx-plus{flex:none;padding:0;font-size:9px;line-height:6px;pointer-events:none}
+  .nx-cal .nx-heat{left:5px;right:5px;bottom:4px;height:3px}
+  .nx-cal .cal-cell:has(.nx-evb),.nx-cal .cal-cell:has(.cal-ind){justify-content:center}
+}
+
+/* ── Calendar season: twelve slim columns fit the width; the level and tag
+   labels move to the month card underneath. */
+@media (max-width:767px){
+  .ss-curve{gap:3px;padding:14px 10px 12px;overflow-x:visible}
+  .ss-col{min-width:0;padding:6px 0 8px;gap:6px;border-radius:10px}
+  .ss-col .lv,.ss-col .tag{display:none}
+  .ss-col .track{width:16px;height:150px;border-radius:7px}
+  .ss-col b{font-size:10.5px;font-weight:600}
+  .ss-month{padding:18px 18px}
+  .ss-month h2{font-size:22px}
+}
+
+/* ── Stepper (pipeline counts): once it stacks, run it down the left with a
+   vertical connector, label left and count right. */
+@media (max-width:860px){
+  .oss-steps li{display:grid;grid-template-columns:14px minmax(0,1fr) auto;column-gap:12px;row-gap:1px;align-items:center;padding:0 0 14px}
+  .oss-steps li:last-child{padding-bottom:0}
+  .oss-steps li::before{left:6px;right:auto;top:16px;bottom:0;width:2px;height:auto}
+  .oss-steps .dot{grid-column:1;grid-row:1;margin:0}
+  .oss-steps .l{grid-column:2;grid-row:1;font-size:13px;color:var(--body)}
+  .oss-steps .n{grid-column:3;grid-row:1;font-size:18px;text-align:right}
+  .oss-steps .s{grid-column:2 / -1;grid-row:2}
+}
+
+/* ── Ireland map: fill the width; names only for the picked pin. */
+@media (max-width:767px){
+  .oss-ireland{width:100%;height:auto !important;max-height:440px}
+  .oss-ireland .pin .lbl{display:none}
+  .oss-ireland .pin.on .lbl{display:inline}
+}
+
+/* ── Filter chips: one swipeable line per group instead of a wall of rows. */
+@media (max-width:767px){
+  .nx-filters .row.chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px;overscroll-behavior-x:contain}
+  .nx-filters .row.chips::-webkit-scrollbar{display:none}
+  .nx-filters .row.chips > *{flex:none;max-width:none}
+}
+
+/* ── Card headers: when the right-hand controls don't fit beside the title,
+   they drop to their own line instead of squeezing the title to "Set-up c…". */
+@media (max-width:767px){
+  .oss-card-h{flex-wrap:wrap;row-gap:10px;padding:16px 16px 10px}
+  .oss-card-h .ttl{flex:1 1 150px}
+  .oss-card-h .right{flex:0 1 auto;max-width:100%}
+  .oss-card-b{padding:4px 16px 16px}
+  .oss-card-b.flush{padding:0 6px 8px}
+}
+
+/* ── Kanban boards (bookings, recruitment): swipe lane by lane, each lane most of the screen wide. */
+@media (max-width:767px){
+  .ev-board,.oss-board:not(.one){grid-template-columns:none !important;grid-auto-flow:column;grid-auto-columns:82%;margin:0 -16px;padding:0 16px 6px;scroll-snap-type:x mandatory;scroll-padding:0 16px;scrollbar-width:none;overscroll-behavior-x:contain}
+  .ev-board::-webkit-scrollbar,.oss-board::-webkit-scrollbar{display:none}
+  .ev-lane,.oss-board > *{scroll-snap-align:start;min-height:200px}
+}
+
+/* ── List rows: actions drop under the text when the row is too narrow, so
+   names and badges keep the width. Tables keep their swipe, with less inset. */
+@media (max-width:767px){
+  .oss-r{flex-wrap:wrap;row-gap:8px;padding:11px 10px}
+  .oss-r .main{flex:1 1 170px}
+  .oss-r .end{max-width:100%;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+  .oss-table td:first-child,.oss-table th:first-child,.oss-table tfoot td:first-child{padding-left:14px}
+  .oss-table td:last-child,.oss-table th:last-child,.oss-table tfoot td:last-child{padding-right:14px}
+  .oss-table td,.oss-table th{padding-left:10px;padding-right:10px}
+}
+
+/* ── Document expiry runway: wider columns that swipe, labels may wrap. */
+@media (max-width:767px){
+  .cw-rw{padding:6px 12px 14px;gap:2px}
+  .cw-rw .col{min-width:52px}
+  .cw-rw .lab{white-space:normal;text-align:center;line-height:1.2}
+}
+
+/* ── Desk/kind chip strips inside cards: one swipeable line. */
+@media (max-width:767px){
+  .cl-kinds{flex-wrap:nowrap !important;overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent)}
+  .cl-kinds::-webkit-scrollbar{display:none}
+  .cl-kinds > *{flex:none}
+  /* Room for the floating chat button under the last row of every page. */
+  .oss-page{padding-bottom:88px}
+}
+
+/* ── Empty state inside a wide, swipeable table: pin it to the visible width
+   so the message isn't centred off-screen. */
+@media (max-width:767px){
+  .oss-table td[colspan] > *{position:sticky;left:0;width:min(100%,calc(100vw - 72px))}
+}
+
+/* ── Tables with four or more columns: give them a real width and let them
+   swipe, rather than crushing the text column to one word per line. */
+@media (max-width:767px){
+  .oss-tw > .oss-table:has(thead th:nth-child(4)){min-width:640px}
+  .oss-tw > .oss-table:has(thead th:nth-child(5)){min-width:760px}
+}
+
+/* ── Agents: the agent list is one block in the page, not a nested scroller. */
+@media (max-width:767px){
+  .ag-list{max-height:none !important;overflow:visible !important}
+}
+
+/* ── Records > Ontology on a phone: same graph, panels and interactions,
+   stacked. The graph goes on top at a usable height and the panels follow.
+   (Layout is unchanged above 768px; RecordsOntology.tsx is not edited.) */
+@media (max-width:767px){
+  div:has(> div > canvas[data-onto-graph]){flex-direction:column !important;height:auto !important;min-height:0 !important}
+  div:has(> div > canvas[data-onto-graph]) > div:first-child{width:auto !important;overflow:visible !important}
+  div:has(> canvas[data-onto-graph]){order:-1;flex:none !important;height:min(440px,58vh)}
+}
+
+/* ── Records > Files: tree above the viewer instead of beside it. */
+@media (max-width:767px){
+  [data-files-split]{flex-direction:column !important;height:auto !important;min-height:0 !important}
+  [data-files-split] > div:first-child:not(:last-child){width:auto !important;max-height:320px}
+  [data-files-split] > div:last-child{min-height:480px}
+  [data-files-split] > div:last-child > div:last-child{padding:20px 18px 26px !important}
+}
+
+/* ── Records > Clients & contacts: name and tag only; role, email and
+   organisation are one tap away in the record. */
+@media (max-width:767px){
+  [data-contacts-grid]{grid-template-columns:minmax(0,1fr) auto !important}
+  [data-contacts-grid] > :nth-child(2),[data-contacts-grid] > :nth-child(3),[data-contacts-grid] > :nth-child(4){display:none !important}
+  [data-contacts-grid] > *{padding-left:16px !important;padding-right:16px !important}
+}
+
+/* Inputs never push past their card. */
+@media (max-width:767px){
+  .oss-input{max-width:100%}
+}
+
+/* ── Home chat thread: the title gets its own line above the flap clock, and
+   answer tables swipe sideways instead of clipping every column. */
+@media (max-width:767px){
+  [data-thread-head]{flex-wrap:wrap;row-gap:10px;padding-bottom:16px !important}
+  [data-thread-head] > div:first-child{flex:1 1 100% !important}
+  [data-answer-table]{overflow-x:auto !important;overscroll-behavior-x:contain;scrollbar-width:none}
+  [data-answer-table] > div{min-width:560px}
+}
+
+/* ── New booking form: shift name on its own line, then start, end, staff. */
+@media (max-width:767px){
+  .ev-shiftrow{grid-template-columns:repeat(3,minmax(0,1fr)) !important}
+  .ev-shiftrow > :first-child{grid-column:1 / -1}
+  .ev-shiftrow > :last-child{grid-column:1 / -1;justify-self:end}
+}
+
+/* The floating chat button steps aside while a drawer or sheet is open, so
+   it never sits on the drawer's Save / Cancel row. */
+@media (max-width:767px){
+  body:has(.oss-scrim) button.ix18,body:has(.oss-phonewrap) button.ix18{display:none !important}
+}

@@ -56,3 +56,19 @@ export default function NavThumb({ style, tabsKey }: Props) {
 
   return <span ref={ref} style={css(style)} />;
 }
+
+/* When the tabs are packed tight (phones, narrow windows) the active tab paints
+   its own background and NavThumb isn't mounted. This keeps that tab scrolled
+   into view in the overflowing group, so it is never hidden off the edge. */
+export function KeepActiveTabInView({ tabsKey }: { tabsKey: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const group = ref.current?.parentElement;
+    const btn = group?.querySelector<HTMLElement>('[data-nav-active="1"]');
+    if (!group || !btn || group.scrollWidth <= group.clientWidth) return;
+    const left = btn.offsetLeft, right = left + btn.offsetWidth;
+    if (left < group.scrollLeft || right > group.scrollLeft + group.clientWidth)
+      group.scrollLeft = Math.max(0, left - (group.clientWidth - btn.offsetWidth) / 2);
+  }, [tabsKey]);
+  return <span ref={ref} aria-hidden="true" style={{ display: "none" }} />;
+}

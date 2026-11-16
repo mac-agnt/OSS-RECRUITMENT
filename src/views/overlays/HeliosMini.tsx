@@ -6,7 +6,7 @@ type Props = { v: any };
 export default function HeliosMini({ v }: Props) {
   return (
     <>
-      <div style={{"position":"fixed","right":"26px","bottom":"96px","zIndex":"46","width":"min(392px,88vw)","maxHeight":"min(580px,74vh)","display":"flex","flexDirection":"column","background":"var(--overlay)","border":"1px solid var(--border-strong)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(48px) saturate(1.5)","boxShadow":"var(--card-shadow),0 30px 72px rgba(0,0,0,.5)","overflow":"hidden","animation":"panelIn .38s cubic-bezier(.16,1,.3,1) both"}}>
+      <div style={{"position":"fixed","right":v.isMobile ? "10px" : "26px","bottom":v.isMobile ? "calc(124px + env(safe-area-inset-bottom))" : "96px","zIndex":"46","width":v.isMobile ? "calc(100vw - 20px)" : "min(392px,88vw)","maxHeight":"min(580px,74vh)","display":"flex","flexDirection":"column","background":"var(--overlay)","border":"1px solid var(--border-strong)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(48px) saturate(1.5)","boxShadow":"var(--card-shadow),0 30px 72px rgba(0,0,0,.5)","overflow":"hidden","animation":"panelIn .38s cubic-bezier(.16,1,.3,1) both"}}>
         <span style={{"position":"absolute","inset":"0","borderRadius":"var(--card-r,18px)","pointerEvents":"none","boxShadow":"inset 0 1px 0 var(--glass-highlight),inset 0 0 0 1px rgba(255,255,255,.03)"}} />
         <span style={{"position":"absolute","left":"-20%","top":"-30%","width":"90%","height":"70%","pointerEvents":"none","filter":"blur(58px)","opacity":".5","background":"var(--glow-a)","borderRadius":"var(--r-sm,9px)"}} />
         <div style={{"position":"relative","flex":"none","display":"flex","alignItems":"center","gap":"10px","padding":"13px 14px","borderBottom":"1px solid var(--border)"}}>

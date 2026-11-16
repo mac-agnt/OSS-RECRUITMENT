@@ -67,7 +67,7 @@ function AuditRefs({ s }: { s: OssState }) {
       <Card pad={false} title={<input className="oss-input" style={{ width: 280, height: 34 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search IDs or names" aria-label="Search references" />}>
         <Table rows={rows} rowKey={(m) => m.id} maxHeight={640} onRow={(m) => openDrawer(m.entityType === "worker" ? "worker" : "client", m.localId)}
           cols={[{ key: "t", label: "Entity", render: (m) => m.entityType === "worker" ? "Worker" : "Client" }, { key: "l", label: "Local", render: (m) => <span><span className="oss-mono">{m.localId}</span> {Q.nameOf(s, m.localId) !== m.localId ? Q.nameOf(s, m.localId) : m.entityType === "client" ? Q.clientOf(s, m.localId).name : ""}</span> },
-            { key: "r", label: "Bullhorn reference (sample)", render: (m) => m.remoteId ? <span className="oss-mono">{m.remoteId}</span> : <S s="Mapping pending" /> },
+            { key: "r", label: "Bullhorn reference", render: (m) => m.remoteId ? <span className="oss-mono">{m.remoteId}</span> : <S s="Mapping pending" /> },
             { key: "p", label: "Provenance", render: (m) => <span className="oss-small oss-dim">{m.note}{m.confirmedBy ? " · " + Q.nameOf(s, m.confirmedBy) + " " + when(m.confirmedAt) : ""}</span> }]} />
       </Card>
     </Page>
@@ -86,7 +86,7 @@ export function OntologyLineage() {
   if (asg) {
     const sh = Q.shiftOf(s, asg.shiftId);
     const inv = s.invitations.find((i) => i.id === asg.invitationId);
-    steps.push({ k: "Invitation", label: inv ? Q.inviteLabel(s, inv) + " " + (inv.respondedAt ? fmtTime(inv.respondedAt) : "") : "—", id: inv?.id, tone: "ok" });
+    steps.push({ k: "Invitation", label: inv ? Q.inviteLabel(s, inv) + " " + (inv.respondedAt ? fmtTime(inv.respondedAt) : "") : "-", id: inv?.id, tone: "ok" });
     steps.push({ k: "Accepted shift", label: Q.eventOf(s, sh.eventId).name.split(":")[0] + " " + sh.label.toLowerCase(), id: asg.id, state: asg.status, tone: asg.status === "confirmed" ? "ok" : "bad", open: () => openDrawer("event", sh.eventId) });
     const cl = Q.clocksOf(s, asg.id);
     const vin = Q.verifiedIn(s, asg.id), vout = Q.verifiedOut(s, asg.id);
@@ -97,7 +97,7 @@ export function OntologyLineage() {
     const l = Q.lineFor(s, asg);
     if (l) steps.push({ k: "Timesheet", label: (l.complete ? fmtHM(l.payableMin) + " payable" : "incomplete") + " · v" + l.version + " · " + l.status.replace("_", " "), id: l.id, tone: l.status === "approved" || l.status === "exported" ? "ok" : l.status === "incomplete" ? "bad" : "info", open: () => openDrawer("timesheet", asg.id) });
     const it = s.items.filter((i) => i.assignmentId === asg.id).pop();
-    steps.push({ k: "Handover receipt", label: it ? (it.receipt ? it.receipt + " (simulated)" : it.state) : "not sent", id: it?.batchId, tone: it?.state === "accepted" ? "sim" : it ? "bad" : "neutral", open: it ? () => openDrawer("batch", it.batchId) : undefined });
+    steps.push({ k: "Handover receipt", label: it ? (it.receipt ? it.receipt : it.state) : "not sent", id: it?.batchId, tone: it?.state === "accepted" ? "ok" : it ? "bad" : "neutral", open: it ? () => openDrawer("batch", it.batchId) : undefined });
   }
   return (
     <div style={{ padding: "14px 22px 28px" }}>

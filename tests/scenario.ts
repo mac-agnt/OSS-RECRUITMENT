@@ -21,8 +21,8 @@ const inv = (d: OssState, sh: string, w: string) => d.invitations.filter((i) => 
 const s1 = buildStage(1);
 
 console.log("Opening snapshot");
-check("firm window 106 / 95 / 6 awaiting / 101 allocated / 11 unfilled / 5 not invited / 89.6%", () => {
-  const t = S.windowTotals(s1);
+check("Dublin events desk window 106 / 95 / 6 awaiting / 101 allocated / 11 unfilled / 5 not invited / 89.6%", () => {
+  const t = S.windowTotals(s1, { desk: "Dublin events desk" });
   assert.deepEqual([t.required, t.confirmed, t.awaiting, t.allocated, t.unfilled, t.notInvited, t.coverageLabel], [106, 95, 6, 101, 11, 5, "89.6%"]);
 });
 check("per-event table reconciles", () => {
@@ -31,9 +31,11 @@ check("per-event table reconciles", () => {
 });
 check("pending demand 42 positions, excluded from firm totals", () => {
   assert.equal(S.pendingDemand(s1).positions, 42);
-  assert.equal(S.windowTotals(s1).required, 106);
+  assert.equal(S.windowTotals(s1, { desk: "Dublin events desk" }).required, 106);
 });
-check("96 sample workers", () => assert.equal(s1.workers.length, 96));
+check("96 story workers, network crew start at W101", () => { assert.equal(s1.workers.filter((w) => Number(w.id.slice(1)) < 100).length, 96); assert.ok(s1.workers.length > 700); });
+check("network never shares a worker with a story shift", () => { const story = new Set(s1.assignments.filter((a) => !a.id.startsWith("NASG-")).map((a) => a.workerId)); assert.ok(s1.assignments.filter((a) => a.id.startsWith("NASG-")).every((a) => !story.has(a.workerId))); });
+check("company-wide window is bigger than the desk", () => assert.ok(S.windowTotals(s1).required > 1000));
 check("hero shifts 8/10 and 17/20", () => {
   const a = S.shiftCoverage(s1, "SH-001A"), b = S.shiftCoverage(s1, "SH-001B");
   assert.deepEqual([a.confirmed, a.awaiting, a.allocated, a.unfilled], [8, 1, 9, 2]);
@@ -83,7 +85,7 @@ console.log("Aidan, Sean and the remaining gaps");
     const c = hero(d); assert.deepEqual([c.confirmed, c.awaiting, c.unfilled], [30, 0, 0]);
     assert.equal(d.assignments.filter((a) => a.workerId === "W029" && a.status === "confirmed").length, 1);
   });
-  check("company confirmed 100, six gaps elsewhere", () => { const t = S.windowTotals(d); assert.deepEqual([t.required, t.confirmed, t.unfilled], [106, 100, 6]); });
+  check("desk confirmed 100, six gaps elsewhere", () => { const t = S.windowTotals(d, { desk: "Dublin events desk" }); assert.deepEqual([t.required, t.confirmed, t.unfilled], [106, 100, 6]); });
   check("fill task closed only when the event is full", () => assert.equal(d.tasks.find((t) => t.id === "TSK-0001")!.status, "done"));
   check("capacity never exceeded", () => {
     for (const sh of d.shifts) assert.ok(S.shiftCoverage(d, sh.id).confirmed <= sh.required, sh.id);
@@ -94,12 +96,14 @@ console.log("Registration");
 {
   const d = clone(s1);
   const r = E.registerWorker(d, { name: "Aidan Murphy", email: " Aidan.Murphy@EXAMPLE.test ", mobile: "", role: "Stagehand", locality: "Clondalkin" }, "Mark Walsh");
-  check("re-entering Aidan's email opens existing profile, workforce stays 96", () => { assert.equal(r.ok, false); assert.equal(r.data.existing, "W009"); assert.equal(d.workers.length, 96); });
+  const before = d.workers.length;
+  check("re-entering Aidan's email opens existing profile, workforce unchanged", () => { assert.equal(r.ok, false); assert.equal(r.data.existing, "W009"); assert.equal(d.workers.length, before); });
   const n = E.registerWorker(d, { name: "Cara Lennox", email: "cara.lennox@example.test", mobile: "085 555 7711", role: "Event crew", locality: "Swords" }, "Mark Walsh");
   check("new registration creates one pending row with mapping pending", () => {
-    assert.ok(n.ok); assert.equal(d.workers.length, 97);
-    assert.equal(d.workers[96].status, "pending_compliance");
-    assert.equal(d.mappings.find((m) => m.localId === d.workers[96].id)!.status, "missing");
+    assert.ok(n.ok); assert.equal(d.workers.length, before + 1);
+    const nw = d.workers[d.workers.length - 1];
+    assert.equal(nw.status, "pending_compliance"); assert.ok(!s1.workers.some((w) => w.id === nw.id));
+    assert.equal(d.mappings.find((m) => m.localId === nw.id)!.status, "missing");
   });
 }
 
@@ -126,7 +130,7 @@ const s3 = buildStage(3);
   check("Orla accepts: 20/20, task closed, company back to 100", () => {
     assert.equal(S.shiftCoverage(d, "SH-001B").confirmed, 20);
     assert.equal(d.tasks.filter((t) => t.kind === "replacement" && t.status !== "done").length, 0);
-    assert.equal(S.windowTotals(d).confirmed, 100);
+    assert.equal(S.windowTotals(d, { desk: "Dublin events desk" }).confirmed, 100);
   });
   d.clock = zoned("2026-11-14", "16:50");
   E.journey(d, "ASG-001B-W021", "on_site");
@@ -210,6 +214,12 @@ const s5 = buildStage(5);
 
 console.log("Reset and automations");
 check("stage rebuild is deterministic", () => assert.equal(JSON.stringify(buildStage(4)), JSON.stringify(s4)));
+check("starting over after later stages restores the Thursday snapshot", () => {
+  buildStage(5);
+  const fresh = buildStage(1);
+  assert.equal(fresh.venues.find((v) => v.id === "V01")!.meetingConfirmed, false);
+  assert.equal(S.eventCoverage(fresh, "EVT-001").confirmed, 25);
+});
 {
   const d = clone(s3);
   E.setClock(d, zoned("2026-11-14", "16:00")); const n1 = d.messages.length;

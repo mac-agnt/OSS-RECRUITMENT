@@ -1,235 +1,330 @@
+/* Timesheets: drafts generated from clock records, scheduled against actual,
+   the five-hour minimum, overtime past the scheduled finish, corrections with
+   an approver, and the handover of approved hours to Bullhorn. */
+
+import "../../styles/oss-ops.css";
+import "../../styles/oss-events.css";
 import { useMemo, useState } from "react";
 import type { OssState } from "../model";
 import * as E from "../engine";
 import * as Q from "../selectors";
-import { navigate, openDrawer, run, useOss } from "../store";
+import { navigate, openDrawer, run, setUi, useOss } from "../store";
 import { tabOf } from "../modules";
-import { addDays, dayKey, fmtDate, fmtDayMonth, fmtHM, fmtTime, zoned } from "../time";
-import { Btn, Card, Drawer, Empty, I, KV, Metric, Page, S, Scope, Seg, St, Table, TimeSelect, type Col } from "../ui/kit";
+import { dayKey, fmtDate, fmtDayMonth, fmtHM, fmtTime } from "../time";
+import { Av, Btn, Card, Drawer, I, Icon, KV, Meter, Page, Row, RIcon, Search, St, Steps, Table, TimeSelect, kindVar, type Col } from "../ui/kit";
+import { DESKS } from "../network";
+import { DESK_SHORT, deskC } from "./Events";
 import { LineStatus } from "../ui/drawers";
-import { RecLink, WorkerLink, downloadCsv, hm, when } from "../ui/fmt";
+import { hm, when } from "../ui/fmt";
 
 export default function Timesheets() {
   const s = useOss();
   const tab = tabOf(s, "Timesheets");
   if (tab === "corrections") return <Corrections s={s} />;
-  if (tab === "approvals") return <Approvals s={s} />;
-  if (tab === "reports") return <Reports s={s} />;
-  if (tab === "handover") return <Handover s={s} />;
+  if (tab === "bullhorn") return <Bullhorn s={s} />;
   return <Review s={s} />;
 }
 
-const WEEKS = ["2026-11-09", "2026-11-16"];
-const weekLabel = (w: string) => "Mon " + fmtDayMonth(zoned(w, "12:00")) + " to Sun " + fmtDayMonth(zoned(addDays(w, 6), "12:00"));
-
 export function lineCols(s: OssState, opts: { select?: { sel: string[]; toggle: (id: string) => void } } = {}): Col<Q.Line>[] {
   const c: Col<Q.Line>[] = [];
-  if (opts.select) c.push({ key: "x", label: "", width: "34px", render: (l) => l.status === "ready" ? <input type="checkbox" aria-label={"Select " + l.worker.name} checked={opts.select!.sel.includes(l.asg.id)} onChange={() => opts.select!.toggle(l.asg.id)} onClick={(e) => e.stopPropagation()} style={{ width: 16, height: 16, accentColor: "var(--accent)" }} /> : null });
+  if (opts.select) c.push({ key: "x", label: "", width: "36px", render: (l) => l.status === "ready" ? <input type="checkbox" aria-label={"Select " + l.worker.name} checked={opts.select!.sel.includes(l.asg.id)} onChange={() => opts.select!.toggle(l.asg.id)} onClick={(e) => e.stopPropagation()} style={{ width: 16, height: 16, accentColor: "var(--accent)" }} /> : null });
   c.push(
-    { key: "w", label: "Worker", nowrap: true, render: (l) => <span className="strong">{l.worker.name}</span>, foot: "Totals" },
-    { key: "s", label: "Shift", render: (l) => <span style={{ display: "block", maxWidth: 210 }}><span className="oss-ellip" style={{ display: "block" }}>{l.event.name.split(":")[0]}</span><span className="oss-tiny oss-muted oss-ellip" style={{ display: "block" }}>{l.shift.label} · {fmtDate(l.shift.start)}</span></span> },
-    { key: "sc", label: "Scheduled", num: true, render: (l) => fmtTime(l.shift.start) + "–" + fmtTime(l.shift.end) },
-    { key: "raw", label: "Raw clock", num: true, render: (l) => hm(l.rawIn) + "–" + (l.rawOut ? fmtTime(l.rawOut) : <span style={{ color: "var(--bad)" }}>missing</span>) },
-    { key: "ap", label: "Approved interval", num: true, render: (l) => l.complete ? <span>{fmtTime(l.approvedStart!)}–{fmtTime(l.approvedEnd!)}{dayKey(l.approvedEnd!) !== dayKey(l.approvedStart!) ? <span className="oss-tiny oss-muted"> +1d</span> : null}{l.correctionNote ? <span className="oss-tiny" style={{ color: "var(--accent)" }}> corrected</span> : null}</span> : "—" },
-    { key: "b", label: "Break", num: true, render: (l) => fmtHM(l.breakMin) },
-    { key: "wk", label: "Worked", num: true, render: (l) => l.complete ? fmtHM(l.workedMin) : "—" },
-    { key: "tu", label: "Min. top-up", num: true, render: (l) => l.topupMin ? fmtHM(l.topupMin) : "—" },
-    { key: "p", label: "Payable", num: true, render: (l) => l.complete ? <b className="oss-ink">{fmtHM(l.payableMin)}</b> : "—" },
-    { key: "x2", label: "Past finish", num: true, render: (l) => l.extraMin ? <St tone="warn">{fmtHM(l.extraMin)}</St> : "—" },
-    { key: "st", label: "State", render: (l) => <LineStatus st={l.status} /> }
+    { key: "w", label: "Employee", nowrap: true, render: (l) => <span className="oss-row"><Av name={l.worker.name} size="sm" /><span><span className="strong">{l.worker.name}</span><div className="oss-tiny oss-muted">{l.shift.label} · {fmtDate(l.shift.start)}</div></span></span>, foot: "Total" },
+    { key: "sc", label: "Rostered", num: true, render: (l) => fmtTime(l.shift.start) + "-" + fmtTime(l.shift.end) },
+    { key: "in", label: "In", num: true, render: (l) => l.approvedStart ? fmtTime(l.approvedStart) : <span style={{ color: "var(--bad)" }}>missing</span> },
+    { key: "out", label: "Out", num: true, render: (l) => l.approvedEnd ? <span>{fmtTime(l.approvedEnd)}{dayKey(l.approvedEnd) !== dayKey(l.shift.start) ? <span className="oss-tiny oss-muted"> +1</span> : null}{l.correctionNote ? <span className="oss-tiny" style={{ color: "var(--accent)" }}> edited</span> : null}</span> : <span style={{ color: "var(--bad)" }}>missing</span> },
+    { key: "sm", label: "Rostered hrs", num: true, render: (l) => fmtHM(l.scheduledMin) },
+    { key: "wk", label: "Worked", num: true, render: (l) => l.complete ? fmtHM(l.workedMin) : "-" },
+    { key: "tu", label: "5h minimum", num: true, render: (l) => l.topupMin ? <St tone="info">+{fmtHM(l.topupMin)}</St> : <span className="oss-muted">-</span> },
+    { key: "x2", label: "Overtime", num: true, render: (l) => l.extraMin ? <St tone="warn">{fmtHM(l.extraMin)}</St> : <span className="oss-muted">-</span> },
+    { key: "p", label: "Payable", num: true, render: (l) => l.complete ? <b className="oss-ink">{fmtHM(l.payableMin)}</b> : "-" },
+    { key: "st", label: "Status", render: (l) => <LineStatus st={l.status} /> }
   );
   return c;
 }
 function withFoot(cols: Col<Q.Line>[], ls: Q.Line[]) {
   const t = Q.totals(ls);
-  const f: Record<string, string> = { sc: fmtHM(t.scheduled), wk: fmtHM(t.worked), tu: fmtHM(t.topup), p: fmtHM(t.payable), x2: fmtHM(t.extra), b: fmtHM(t.breaks) };
+  const f: Record<string, string> = { sm: fmtHM(t.scheduled), wk: fmtHM(t.worked), tu: "+" + fmtHM(t.topup), p: fmtHM(t.payable), x2: fmtHM(t.extra) };
   return cols.map((c) => ({ ...c, foot: c.foot ?? f[c.key] }));
 }
 
+/* ── review & approve ─────────────────────────────────────────────────────── */
+type PickGroup = "ready" | "open" | "done";
+const PICK_LABEL: Record<PickGroup, string> = { ready: "Ready to approve", open: "On shift or missing a clock", done: "Approved" };
 function Review({ s }: { s: OssState }) {
+  const all = useMemo(() => Q.lines(s), [s]);
+  const byEvent = useMemo(() => { const m = new Map<string, Q.Line[]>(); all.forEach((l) => { const a = m.get(l.event.id); if (a) a.push(l); else m.set(l.event.id, [l]); }); return m; }, [all]);
+  const evOpts = Array.from(byEvent.keys()).map((id) => Q.eventOf(s, id)).sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
   const focusEv = s.ui.focus?.kind === "event" ? s.ui.focus.id : null;
-  const heroLines = Q.lines(s, { eventId: "EVT-001" }).length > 0;
-  const [group, setGroup] = useState<"week" | "client" | "event" | "worker">(focusEv || heroLines ? "event" : "week");
-  const [week, setWeek] = useState(WEEKS[0]);
-  const [ev, setEv] = useState<string>(focusEv || "EVT-001");
-  const [client, setClient] = useState("C01");
-  const [wq, setWq] = useState("");
-  const ls = group === "week" ? Q.lines(s, { weekOf: week }) : group === "event" ? Q.lines(s, { eventId: ev }) : group === "client" ? Q.lines(s, { clientId: client }) : Q.lines(s).filter((l) => !wq || l.worker.name.toLowerCase().includes(wq.toLowerCase()));
+  const [ev, setEv] = useState<string>(focusEv && byEvent.has(focusEv) ? focusEv : byEvent.has("EVT-001") ? "EVT-001" : evOpts[0]?.id || "");
+  const [sel, setSel] = useState<string[]>([]);
+  const [preview, setPreview] = useState(false);
+  const [q, setQ] = useState("");
+  const [desk, setDesk] = useState("all");
+  const ls = ev ? byEvent.get(ev) || [] : [];
   const t = Q.totals(ls);
-  const known = ls.filter((l) => l.complete);
-  const evOpts = s.events.filter((e) => Q.lines(s, { eventId: e.id }).length);
+  const ready = ls.filter((l) => l.status === "ready");
+  const blocked = ls.filter((l) => l.status === "incomplete" || l.status === "needs_review" || l.status === "in_progress");
+  const chosen = ready.filter((l) => sel.includes(l.asg.id));
+  const tt = Q.totals(chosen);
+  const toggle = (id: string) => setSel((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.concat([id])));
+  if (!evOpts.length) return (
+    <Page eyebrow="Timesheets" title="No hours yet" sub="Timesheets are drafted automatically from clock-ins and clock-outs once a shift starts.">
+      <Card icon={I.clock} title="Nothing to review" meta="Move the story to event day or the morning after to see the 3Arena hours"><span /></Card>
+    </Page>);
+  const e = Q.eventOf(s, ev);
+  const done = ls.filter((l) => l.status === "approved" || l.status === "exported").length;
+  const sent = ls.filter((l) => l.status === "exported").length;
+  const groupOf = (id: string): PickGroup => { const l = byEvent.get(id) || []; return l.some((x) => x.status === "ready") ? "ready" : l.some((x) => x.status === "incomplete" || x.status === "needs_review" || x.status === "in_progress") ? "open" : "done"; };
+  const needle = q.trim().toLowerCase();
+  const shown = evOpts.filter((x) => (desk === "all" || Q.deskOf(x) === desk) && (!needle || (x.name + " " + Q.clientOf(s, x.clientId).name + " " + Q.deskOf(x)).toLowerCase().includes(needle)));
+  const groups = (["ready", "open", "done"] as PickGroup[]).map((g) => ({ g, list: shown.filter((x) => groupOf(x.id) === g) }));
+  const readyAll = all.filter((l) => l.status === "ready").length;
+  const doneAll = all.filter((l) => l.status === "approved" || l.status === "exported").length;
   return (
-    <Page title="Timesheet review" sub="Drafts come from verified clock records and approved corrections. Missing entries are incomplete and stay out of final totals until reviewed."
-      scope={<Scope><b>{group === "week" ? weekLabel(week) : group === "event" ? Q.eventOf(s, ev)?.name : group === "client" ? Q.clientOf(s, client).name : "All workers"}</b></Scope>}
-      actions={<Seg value={group} onChange={setGroup} label="Group by" options={[{ id: "week", label: "Week" }, { id: "client", label: "Client" }, { id: "event", label: "Event" }, { id: "worker", label: "Worker" }]} />}>
-      <div className="oss-grid oss-g4" style={{ marginBottom: 14 }}>
-        <Metric label="Lines" value={t.count} sub={t.incomplete ? t.incomplete + " incomplete" : "All complete"} tone={t.incomplete ? "warn" : undefined} />
-        <Metric label="Scheduled" value={fmtHM(t.scheduled)} sub="All lines" />
-        <Metric label={t.incomplete ? "Worked (provisional, known lines)" : "Worked"} value={fmtHM(t.worked)} sub={t.worked.toLocaleString("en-IE") + " minutes"} />
-        <Metric label={t.incomplete ? "Payable (provisional)" : "Payable"} value={fmtHM(t.payable)} sub={"incl. " + fmtHM(t.topup) + " minimum top-up · " + fmtHM(t.extra) + " past finish flagged"} />
+    <Page eyebrow={"Timesheets · " + e.name.split(":")[0] + " · " + fmtDate(e.date + "T12:00:00Z")} title="Review and approve hours" sub="Drafted from verified clock records. Rostered against actual, the five-hour minimum and overtime are worked out for you. Each desk approves its own events; everything lands here.">
+      <section className="nx-picker" aria-label="Choose an event">
+        <div className="nx-picker-h">
+          <span className="nx-k">Events with hours</span>
+          <span className="oss-small oss-dim"><b className="oss-ink">{all.length.toLocaleString("en-IE")}</b> lines across {evOpts.length} events · <b className="oss-ink">{readyAll}</b> ready · <b className="oss-ink">{doneAll.toLocaleString("en-IE")}</b> approved</span>
+          <span className="grow" />
+          <Search value={q} onChange={setQ} placeholder="Search events" style={{ width: 220, maxWidth: "100%" }} />
+          <select className="oss-input nx-sel" value={desk} onChange={(x) => setDesk(x.target.value)} aria-label="Desk"><option value="all">All desks</option>{DESKS.map((d) => <option key={d} value={d}>{d}</option>)}</select>
+        </div>
+        <div className="nx-picker-b">
+          {groups.map(({ g, list }) => list.length > 0 && (
+            <div key={g} className={"nx-pg " + g}>
+              <div className="nx-pg-h"><span className="oss-dot" />{PICK_LABEL[g]}<span>{list.length}</span></div>
+              <div className="nx-pg-l" role="listbox" aria-label={PICK_LABEL[g]}>
+                {list.map((x) => { const xl = byEvent.get(x.id) || []; const xr = xl.filter((l) => l.status === "ready").length; const xd = xl.filter((l) => l.status === "approved" || l.status === "exported").length; const xb = xl.length - xr - xd; return (
+                  <button key={x.id} role="option" aria-selected={x.id === ev} className={"nx-pi" + (x.id === ev ? " on" : "")} style={{ ["--k" as any]: kindVar(Q.kindOf(s, x)) }} onClick={() => { setEv(x.id); setSel([]); }}>
+                    <span className="t">{x.name.split(":")[0]}<i className="nx-deskdot" title={Q.deskOf(x)} style={{ background: deskC(Q.deskOf(x)) }} /></span>
+                    <span className="s">{fmtDate(x.date + "T12:00:00Z")} · {xl.length} lines{xr ? " · " + xr + " ready" : ""}{xb ? " · " + xb + " open" : ""}</span>
+                    <span className="m"><i className="d" style={{ flexGrow: xd }} /><i className="r" style={{ flexGrow: xr }} /><i className="b" style={{ flexGrow: xb }} /></span>
+                  </button>); })}
+              </div>
+            </div>))}
+          {!shown.length && <div className="oss-small oss-dim" style={{ padding: 12 }}>No events match.</div>}
+        </div>
+      </section>
+      <div className="ops-review">
+        <div className="ops-review-main">
+          {blocked.length > 0 && <div className="ops-blocked">
+            <Icon d={I.alert} size={16} />
+            <span className="grow"><b>{blocked.length} line{blocked.length > 1 ? "s" : ""} can't be approved yet.</b> {blocked.map((l) => l.worker.name + (l.status === "incomplete" ? " (missing clock)" : l.status === "needs_review" ? " (correction waiting)" : " (still on shift)")).join(", ")}.</span>
+            <Btn size="sm" onClick={() => navigate("Timesheets", "corrections")}>Fix</Btn></div>}
+          <Card pad={false} title={e.name} meta={ls.length + " lines · " + ready.length + " ready · " + done + " approved"} icon={I.doc}
+            right={<Btn size="sm" disabled={!ready.length} onClick={() => setSel(ready.map((l) => l.asg.id))}>Select all ready ({ready.length})</Btn>}>
+            <Table rows={ls} rowKey={(l) => l.id} onRow={(l) => openDrawer("timesheet", l.asg.id)} cols={withFoot(lineCols(s, { select: { sel, toggle } }), ls)} foot maxHeight={680}
+              empty={<div className="oss-empty"><b>No lines</b></div>} />
+          </Card>
+        </div>
+        <aside className="ops-receipt-wrap" aria-label="Hours summary">
+          <div className="ops-receipt">
+            <div className="ops-rc-head"><span>OSS Recruitment</span><b>Hours docket</b><small>{e.name.split(":")[0]} · {fmtDate(e.date + "T12:00:00Z")}</small></div>
+            <div className="ops-rc-rows">
+              <div><span>Lines</span><b>{ls.length}</b></div>
+              <div><span>Rostered</span><b>{fmtHM(t.scheduled)}</b></div>
+              <div><span>Worked</span><b>{fmtHM(t.worked)}</b></div>
+              <div className="add"><span>5h minimum top-up</span><b>+{fmtHM(t.topup)}</b></div>
+            </div>
+            <div className="ops-rc-total"><span>Payable</span><b>{fmtHM(t.payable)}</b>{t.incomplete > 0 && <small>Provisional, {t.incomplete} missing a clock</small>}</div>
+            <div className="ops-rc-rows">
+              <div className="ot"><span>Overtime past finish</span><b>{fmtHM(t.extra)}</b></div>
+            </div>
+            <div className="ops-rc-note">Time past the rostered finish is flagged for review. No multiplier is applied.</div>
+            <div className="ops-rc-meter"><Meter height={8} total={ls.length || 1} parts={[{ n: done, tone: "ok", label: "approved" }, { n: ready.length, tone: "accent", label: "ready" }, { n: blocked.length, tone: "bad", label: "blocked" }]} /></div>
+            {chosen.length > 0 && <div className="ops-rc-sel">
+              <span className="k">This approval</span>
+              <div><span>{chosen.length} line{chosen.length === 1 ? "" : "s"}</span><b>{fmtHM(tt.payable)}</b></div>
+              <button className="oss-link oss-small" onClick={() => setSel([])}>Clear selection</button>
+            </div>}
+            <div className="ops-rc-acts">
+              <Btn kind="primary" block icon={I.check} disabled={!chosen.length} onClick={() => setPreview(true)}>{chosen.length ? "Approve " + chosen.length + " line" + (chosen.length === 1 ? "" : "s") : "Tick lines to approve"}</Btn>
+              {!chosen.length && ready.length > 0 && <Btn block onClick={() => setSel(ready.map((l) => l.asg.id))}>Select all {ready.length} ready</Btn>}
+              {sent > 0 && <Btn block kind="ghost" icon={I.link} onClick={() => navigate("Timesheets", "bullhorn")}>{sent} in Bullhorn</Btn>}
+              {done > sent && <Btn block kind="ghost" icon={I.send} onClick={() => navigate("Timesheets", "bullhorn")}>Send approved to Bullhorn</Btn>}
+            </div>
+          </div>
+        </aside>
       </div>
-      <Card pad={false} title={group === "week" ? <select className="oss-input" style={{ width: 260, height: 34 }} value={week} onChange={(e) => setWeek(e.target.value)} aria-label="Week">{WEEKS.map((w) => <option key={w} value={w}>{weekLabel(w)}</option>)}</select>
-        : group === "event" ? <select className="oss-input" style={{ width: 300, height: 34 }} value={ev} onChange={(e) => setEv(e.target.value)} aria-label="Event">{evOpts.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select>
-        : group === "client" ? <select className="oss-input" style={{ width: 300, height: 34 }} value={client} onChange={(e) => setClient(e.target.value)} aria-label="Client">{s.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-        : <input className="oss-input" style={{ width: 260, height: 34 }} value={wq} onChange={(e) => setWq(e.target.value)} placeholder="Filter workers" aria-label="Filter workers" />}
-        meta={t.incomplete ? "Provisional: " + known.length + " of " + ls.length + " lines complete" : undefined}>
-        <Table rows={ls} rowKey={(l) => l.id} onRow={(l) => openDrawer("timesheet", l.asg.id)} cols={withFoot(lineCols(s), ls)} foot maxHeight={620}
-          empty={<Empty title="No timesheet lines here yet" body="Lines appear once a shift starts. Load the Hours review stage from Demo controls to see the completed 3Arena shifts." />} />
-      </Card>
-      <div className="oss-small oss-muted" style={{ marginTop: 10 }}>Minutes are exact (no rounding). Break and minimum rules are sample assumptions to confirm. Time past finish is a review category, not a multiplier, and is not added to payable twice.</div>
+      {preview && <Drawer title={"Approve " + chosen.length + " lines"} eyebrow={e.name} onClose={() => setPreview(false)}
+        footer={<><Btn kind="primary" icon={I.check} onClick={() => { run(E.approveLines, chosen.map((l) => l.asg.id)); setSel([]); setPreview(false); }}>Approve</Btn><Btn onClick={() => setPreview(false)}>Cancel</Btn></>}>
+        <KV items={[["Lines", chosen.length], ["Worked", fmtHM(tt.worked)], ["5h minimum top-up", "+" + fmtHM(tt.topup)], ["Payable", fmtHM(tt.payable)], ["Overtime", fmtHM(tt.extra)], ["Left out", blocked.length]]} />
+        <div className="oss-note" style={{ marginTop: 14 }}>Approval is recorded against your name and this version of each line. Sending to Bullhorn is the next step.</div>
+      </Drawer>}
     </Page>
   );
 }
 
+/* ── corrections ─────────────────────────────────────────────────────────── */
 function Corrections({ s }: { s: OssState }) {
   const focus = s.ui.focus?.kind === "assignment" ? s.ui.focus.id : null;
-  const all = s.corrections.slice().reverse();
+  const proposed = s.corrections.filter((c) => c.status === "proposed");
+  const decided = s.corrections.filter((c) => c.status !== "proposed").reverse();
   const incomplete = Q.lines(s).filter((l) => l.status === "incomplete" && !s.corrections.some((c) => c.assignmentId === l.asg.id && c.status === "proposed"));
-  const [form, setForm] = useState<{ asg: string; field: "in" | "out"; hm: string; reason: string } | null>(null);
+  const [form, setForm] = useState<{ asg: string; field: "in" | "out"; hm: string; reason: string } | null>(() => {
+    const l = focus ? incomplete.find((x) => x.asg.id === focus) : undefined;
+    return l ? { asg: l.asg.id, field: l.rawIn ? "out" : "in", hm: fmtTime(l.rawIn ? l.shift.end : l.shift.start), reason: "" } : null;
+  });
   const start = (l: Q.Line) => setForm({ asg: l.asg.id, field: l.rawIn ? "out" : "in", hm: fmtTime(l.rawIn ? l.shift.end : l.shift.start), reason: "" });
+  const nm = (asgId: string) => Q.nameOf(s, Q.asgOf(s, asgId).workerId);
+  const hist = (c: (typeof s.corrections)[number]) => Q.shiftOf(s, Q.asgOf(s, c.assignmentId).shiftId);
   return (
-    <Page title="Corrections" sub="Before and after, with reason, requester, approver and version. The original clock record is never overwritten; whoever proposes cannot approve.">
-      {incomplete.length > 0 && <Card title="Incomplete lines needing a correction" pad={false}>
-        <Table rows={incomplete} rowKey={(l) => l.id} selected={focus ? "TS-" + focus : null}
-          cols={[{ key: "w", label: "Worker", render: (l) => <WorkerLink s={s} id={l.worker.id} /> }, { key: "s", label: "Shift", render: (l) => l.event.name.split(":")[0] + ", " + l.shift.label.toLowerCase() },
-            { key: "r", label: "Raw clock", render: (l) => hm(l.rawIn) + " to " + (l.rawOut ? fmtTime(l.rawOut) : "missing") },
-            { key: "a", label: "", render: (l) => <Btn size="sm" kind="primary" onClick={() => start(l)}>Propose correction</Btn> }]} />
-      </Card>}
-      <Card title="Correction requests" pad={false} style={{ marginTop: 14 }}>
-        <Table rows={all} rowKey={(c) => c.id} empty={<Empty title="No corrections yet" body="A supervisor can propose one from the phone view or from an incomplete line above." />}
-          cols={[{ key: "w", label: "Worker", render: (c) => <WorkerLink s={s} id={Q.asgOf(s, c.assignmentId).workerId} /> },
-            { key: "f", label: "Field", render: (c) => "Clock-" + c.field },
-            { key: "b", label: "Before", render: (c) => <span style={{ textDecoration: "line-through", color: "var(--faint)" }}>{c.original ? fmtTime(c.original) : "missing"}</span> },
-            { key: "a", label: "After", render: (c) => <b className="oss-ink">{fmtTime(c.proposed)}{dayKey(c.proposed) !== dayKey(Q.shiftOf(s, Q.asgOf(s, c.assignmentId).shiftId).start) ? " (+1d)" : ""}</b> },
-            { key: "r", label: "Reason", render: (c) => <span className="oss-small">{c.reason}{c.note ? <div className="oss-tiny oss-muted">{c.note}</div> : null}</span> },
-            { key: "by", label: "Requested", render: (c) => <span className="oss-small">{Q.nameOf(s, c.requestedBy)}<div className="oss-tiny oss-muted">{when(c.requestedAt)}</div></span> },
-            { key: "d", label: "Decision", render: (c) => c.status === "proposed" ? <S s="Needs review" /> : <span className="oss-small"><S s={c.status === "approved" ? "Approved" : "Rejected"} /><div className="oss-tiny oss-muted">{Q.nameOf(s, c.decidedBy!)} · {when(c.decidedAt)}</div></span> },
-            { key: "x", label: "", render: (c) => c.status === "proposed" ? <span style={{ display: "flex", gap: 6 }}><Btn size="sm" kind="primary" onClick={() => run(E.decideCorrection, c.id, true)}>Approve</Btn><Btn size="sm" onClick={() => run(E.decideCorrection, c.id, false)}>Reject</Btn></span> : <Btn size="sm" kind="ghost" onClick={() => openDrawer("timesheet", c.assignmentId)}>Line</Btn> }]} />
-      </Card>
-      {form && <Drawer title={"Propose clock-" + form.field + " for " + Q.nameOf(s, Q.asgOf(s, form.asg).workerId)} onClose={() => setForm(null)}
+    <Page eyebrow="Corrections" title="Fix a missing or wrong time" sub="The original clock record is kept. Every change shows before and after, the reason, who asked and who approved. Nobody approves their own.">
+      <div className="ops-fix-h">
+        <span className="ops-fix-count"><b>{proposed.length}</b> waiting for approval</span>
+        <span className={"ops-fix-count" + (incomplete.length ? " bad" : "")}><b>{incomplete.length}</b> missing clock{incomplete.length === 1 ? "" : "s"}</span>
+        <span className="ops-fix-count"><b>{decided.length}</b> decided</span>
+      </div>
+      <div className="ops-fix-grid">
+        {proposed.map((c) => {
+          const sh = Q.shiftOf(s, Q.asgOf(s, c.assignmentId).shiftId);
+          const nextDay = dayKey(c.proposed) !== dayKey(sh.start);
+          return (
+            <article key={c.id} className="ops-fix">
+              <header className="oss-row" style={{ gap: 12 }}>
+                <Av name={nm(c.assignmentId)} lg />
+                <span className="grow" style={{ minWidth: 0 }}>
+                  <b className="ops-fix-name">{nm(c.assignmentId)}</b>
+                  <span className="ops-fix-sub">{Q.eventOf(s, sh.eventId).name.split(":")[0]}, {sh.label} · rostered {fmtTime(sh.start)}-{fmtTime(sh.end)}</span>
+                </span>
+                <St tone="info">Clock-{c.field}</St>
+              </header>
+              <div className="ops-diff">
+                <div className={"was" + (c.original ? "" : " miss")}><span>Recorded</span><b>{c.original ? fmtTime(c.original) : "Missing"}</b><small>{c.original ? "From the phone" : "No clock-" + c.field + " on file"}</small></div>
+                <span className="arrow" aria-hidden="true"><Icon d="M5 12h14 M13 6l6 6-6 6" size={18} /></span>
+                <div className="now"><span>Proposed</span><b>{fmtTime(c.proposed)}</b><small>{nextDay ? "Next day, " + fmtDate(c.proposed) : fmtDate(c.proposed)}</small></div>
+              </div>
+              <blockquote className="ops-quote">{c.reason}{c.note ? <span> · {c.note}</span> : null}</blockquote>
+              <footer className="ops-fix-f">
+                <span className="oss-tiny oss-muted grow">Proposed by {Q.nameOf(s, c.requestedBy)}, {fmtDate(c.requestedAt)} {fmtTime(c.requestedAt)}</span>
+                <Btn size="sm" onClick={() => run(E.decideCorrection, c.id, false)}>Reject</Btn>
+                <Btn size="sm" kind="primary" icon={I.check} onClick={() => run(E.decideCorrection, c.id, true)}>Approve</Btn>
+              </footer>
+            </article>);
+        })}
+        {!proposed.length && <div className="ops-fix ops-fix-empty"><Icon d={I.check} size={20} /><b>Nothing waiting for approval</b><span>Supervisors propose fixes from their phone. The office can propose one from a missing clock below.</span></div>}
+      </div>
+      <div className="oss-grid oss-g2" style={{ alignItems: "start", marginTop: 18 }}>
+        <Card title="Missing clocks" meta={incomplete.length ? "Propose the right time to unblock approval" : "Every line has both clocks"} icon={I.clock} flush>
+          <div className="oss-rows">
+            {incomplete.map((l) => (
+              <Row key={l.id} sel={focus === l.asg.id} lead={<Av name={l.worker.name} />} title={l.worker.name}
+                sub={<span className="ops-clockpair"><span>{l.event.name.split(":")[0]}, {l.shift.label}</span><span className="pair"><i className={l.rawIn ? "" : "miss"}>In {hm(l.rawIn)}</i><i className={l.rawOut ? "" : "miss"}>Out {l.rawOut ? fmtTime(l.rawOut) : "missing"}</i></span></span>}
+                end={<Btn size="sm" kind="primary" onClick={() => start(l)}>Propose time</Btn>} />))}
+            {!incomplete.length && <div className="oss-empty"><b>No missing clocks</b></div>}
+          </div>
+        </Card>
+        <Card title="History" meta="Every decision, with both times kept" icon={I.list}>
+          <ol className="ops-hist">
+            {decided.map((c) => (
+              <li key={c.id} className={c.status}>
+                <button onClick={() => openDrawer("timesheet", c.assignmentId)}>
+                  <b>{nm(c.assignmentId)}</b>
+                  <span className="t"><s>{c.original ? fmtTime(c.original) : "missing"}</s> → {fmtTime(c.proposed)} <span className="oss-muted">· {hist(c).label}</span></span>
+                  <span className="by">Asked by {Q.nameOf(s, c.requestedBy)} · {c.status === "approved" ? "approved" : "rejected"} by {Q.nameOf(s, c.decidedBy!)} at {fmtTime(c.decidedAt!)}</span>
+                </button>
+              </li>))}
+            {!decided.length && <li className="none">No decisions yet.</li>}
+          </ol>
+        </Card>
+      </div>
+      {form && <Drawer title={"Clock-" + form.field + " for " + nm(form.asg)} eyebrow="Propose a correction" onClose={() => setForm(null)}
         footer={<><Btn kind="primary" disabled={!form.reason.trim()} onClick={() => { const r = run(E.proposeCorrection, form.asg, form.field, form.hm, form.reason); if (r.ok) setForm(null); }}>Send for approval</Btn><Btn onClick={() => setForm(null)}>Cancel</Btn></>}>
-        <div style={{ display: "grid", gap: 12 }}>
-          <div className="oss-field"><label htmlFor="cf">Field</label><select id="cf" className="oss-input" value={form.field} onChange={(e) => setForm({ ...form, field: e.target.value as any })}><option value="in">Clock-in</option><option value="out">Clock-out</option></select></div>
-          <div className="oss-field"><label htmlFor="ct">Proposed time</label><TimeSelect id="ct" value={form.hm} onChange={(v) => setForm({ ...form, hm: v })} /><div className="help">A clock-out earlier than the start is treated as after midnight.</div></div>
-          <div className="oss-field"><label htmlFor="cr">Reason (required)</label><textarea id="cr" className="oss-input" rows={3} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></div>
-          <div className="oss-note">Proposing as {Q.persona(s).name}. Someone else with approval rights must approve it.</div>
+        <div style={{ display: "grid", gap: 14 }}>
+          <div className="oss-field"><label htmlFor="cf">Which time</label><select id="cf" className="oss-input" value={form.field} onChange={(e) => setForm({ ...form, field: e.target.value as any })}><option value="in">Clock-in</option><option value="out">Clock-out</option></select></div>
+          <div className="oss-field"><label htmlFor="ct">Correct time</label><TimeSelect id="ct" value={form.hm} onChange={(v) => setForm({ ...form, hm: v })} /><div className="help">A clock-out before the start time counts as after midnight.</div></div>
+          <div className="oss-field"><label htmlFor="cr">Reason</label><textarea id="cr" className="oss-input" rows={3} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="e.g. Phone battery died, supervisor saw them leave at 23:30" /></div>
+          <div className="oss-note">Someone else with approval rights signs this off.</div>
         </div>
       </Drawer>}
     </Page>
   );
 }
 
-function Approvals({ s }: { s: OssState }) {
-  const [q, setQ] = useState<"ready" | "blocked" | "approved" | "reopened">("ready");
-  const [sel, setSel] = useState<string[]>([]);
-  const [preview, setPreview] = useState(false);
-  const all = Q.lines(s);
-  const reopenedIds = new Set(s.approvals.filter((a) => a.status === "reopened").map((a) => a.assignmentId));
-  const groups = {
-    ready: all.filter((l) => l.status === "ready"),
-    blocked: all.filter((l) => l.status === "incomplete" || l.status === "needs_review" || l.status === "in_progress"),
-    approved: all.filter((l) => l.status === "approved" || l.status === "exported"),
-    reopened: all.filter((l) => reopenedIds.has(l.asg.id))
-  };
-  const rows = groups[q];
-  const toggle = (id: string) => setSel((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.concat([id])));
-  const chosen = groups.ready.filter((l) => sel.includes(l.asg.id));
-  const tt = Q.totals(chosen);
-  return (
-    <Page title="Approvals" sub="Approve eligible rows independently. Blocked rows are never included silently. Reopening an exported row creates a new version and a new handover item."
-      actions={q === "ready" && <><Btn onClick={() => setSel(groups.ready.map((l) => l.asg.id))} disabled={!groups.ready.length}>Select all ready ({groups.ready.length})</Btn><Btn kind="primary" icon={I.check} disabled={!chosen.length} onClick={() => setPreview(true)}>Approve selected ({chosen.length})</Btn></>}>
-      <Card pad={false} title={<Seg value={q} onChange={(v) => { setQ(v); setSel([]); }} options={[{ id: "ready", label: "Ready", n: groups.ready.length }, { id: "blocked", label: "Blocked", n: groups.blocked.length }, { id: "approved", label: "Approved", n: groups.approved.length }, { id: "reopened", label: "Reopened", n: groups.reopened.length }]} />}>
-        <Table rows={rows} rowKey={(l) => l.id} onRow={(l) => openDrawer("timesheet", l.asg.id)} cols={withFoot(lineCols(s, q === "ready" ? { select: { sel, toggle } } : {}), rows)} foot maxHeight={600}
-          empty={<Empty title={q === "ready" ? "Nothing waiting for approval" : "Nothing here"} body={q === "ready" ? "Lines become ready once both clocks are verified or corrected." : undefined} />} />
-      </Card>
-      {preview && <Drawer title={"Approve " + chosen.length + " lines"} onClose={() => setPreview(false)}
-        footer={<><Btn kind="primary" icon={I.check} onClick={() => { run(E.approveLines, chosen.map((l) => l.asg.id)); setSel([]); setPreview(false); }}>Approve as {Q.persona(s).name}</Btn><Btn onClick={() => setPreview(false)}>Cancel</Btn></>}>
-        <KV items={[["Rows", chosen.length], ["Worked", fmtHM(tt.worked)], ["Minimum top-up", fmtHM(tt.topup)], ["Payable", fmtHM(tt.payable)], ["Past finish (review)", fmtHM(tt.extra)], ["Excluded (blocked)", groups.blocked.length]]} />
-        {groups.blocked.length > 0 && <div className="oss-note warn" style={{ marginTop: 12 }}>Not included: {groups.blocked.map((l) => l.worker.name + " (" + l.status.replace("_", " ") + ")").join(", ")}.</div>}
-        <div className="oss-note" style={{ marginTop: 12 }}>Approval records your name and the line version. It does not send anything; handover is a separate step.</div>
-      </Drawer>}
-    </Page>
-  );
-}
-
-function Reports({ s }: { s: OssState }) {
-  const [client, setClient] = useState("C01");
-  const [week, setWeek] = useState(WEEKS[0]);
-  const ls = Q.lines(s, { clientId: client, weekOf: week }).filter((l) => l.status === "approved" || l.status === "exported");
-  const pendingN = Q.lines(s, { clientId: client, weekOf: week }).length - ls.length;
-  const t = Q.totals(ls);
-  const cols: Col<Q.Line>[] = [
-    { key: "w", label: "Employee", render: (l) => l.worker.name, foot: "Total (" + ls.length + ")" },
-    { key: "e", label: "Event", render: (l) => l.event.name }, { key: "s", label: "Shift", render: (l) => l.shift.label },
-    { key: "d", label: "Date", nowrap: true, render: (l) => fmtDate(l.shift.start) },
-    { key: "a", label: "Approved time", num: true, render: (l) => fmtTime(l.approvedStart!) + "–" + fmtTime(l.approvedEnd!) },
-    { key: "wk", label: "Worked", num: true, render: (l) => fmtHM(l.workedMin), foot: fmtHM(t.worked) },
-    { key: "tu", label: "Min. top-up", num: true, render: (l) => (l.topupMin ? fmtHM(l.topupMin) : "—"), foot: fmtHM(t.topup) },
-    { key: "p", label: "Payable", num: true, render: (l) => fmtHM(l.payableMin), foot: fmtHM(t.payable) },
-    { key: "x", label: "Extra-hours candidate", num: true, render: (l) => (l.extraMin ? fmtHM(l.extraMin) : "—"), foot: fmtHM(t.extra) }
-  ];
-  const exportCsv = () => {
-    const rows = ls.map((l) => [l.worker.name, l.event.name, l.shift.label, l.workDate, fmtTime(l.approvedStart!), fmtTime(l.approvedEnd!), dayKey(l.approvedEnd!), l.workedMin, fmtHM(l.workedMin), l.topupMin, l.payableMin, fmtHM(l.payableMin), l.extraMin]);
-    rows.push(["TOTAL", "", "", "", "", "", "", t.worked, fmtHM(t.worked), t.topup, t.payable, fmtHM(t.payable), t.extra]);
-    downloadCsv("oss-client-report-" + Q.clientOf(s, client).name.toLowerCase().replace(/[^a-z]+/g, "-") + "-" + week + ".csv",
-      ["Employee", "Event", "Shift", "Work date", "Approved start", "Approved end", "End date", "Worked minutes", "Worked (h:mm)", "Minimum top-up minutes", "Payable minutes", "Payable (h:mm)", "Extra-hours candidate minutes"], rows);
-    run((d) => { E.audit(d, Q.persona(d).name, "report.exported", { type: "client", id: client, label: Q.clientOf(d, client).name }, "Exported client report CSV: " + ls.length + " approved rows, " + fmtHM(t.payable) + " payable (" + weekLabel(week) + ")", "systems"); return { ok: true, message: "CSV downloaded (" + ls.length + " rows). Opens in Excel." }; });
-  };
-  return (
-    <Page title="Client reports" sub="Approved hours per client and Monday to Sunday week. No identity documents or private worker data are included."
-      actions={<Btn kind="primary" icon={I.download} disabled={!ls.length} onClick={exportCsv}>Export CSV (opens in Excel)</Btn>}>
-      <Card pad={false} title={<span style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <select className="oss-input" style={{ width: 280, height: 34 }} value={client} onChange={(e) => setClient(e.target.value)} aria-label="Client">{s.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-        <select className="oss-input" style={{ width: 240, height: 34 }} value={week} onChange={(e) => setWeek(e.target.value)} aria-label="Week">{WEEKS.map((w) => <option key={w} value={w}>{weekLabel(w)}</option>)}</select></span>}
-        meta={pendingN ? pendingN + " lines not yet approved are excluded" : undefined}>
-        <Table rows={ls} rowKey={(l) => l.id} cols={cols} foot empty={<Empty title="No approved hours for this client and week" body={pendingN ? pendingN + " lines exist but are not approved yet." : undefined} />} />
-      </Card>
-      <div className="oss-small oss-muted" style={{ marginTop: 10 }}>The CSV contains exactly the rows above, in minutes and h:mm (no decimal hours), UTF-8 with formula-safe cells.</div>
-    </Page>
-  );
-}
-
-function Handover({ s }: { s: OssState }) {
+/* ── Bullhorn ────────────────────────────────────────────────────────────── */
+const FIELDS: [string, string][] = [["Candidate", "Bullhorn candidate ID"], ["Client", "Client corporation ID"], ["Event and shift", "Name, date, rostered start and finish"], ["Approved times", "Start, finish, break"], ["Hours", "Worked, 5h top-up, payable, overtime"], ["Approval", "Approved by and when, any correction"], ["Transfer key", "Stops a retry creating duplicates"]];
+function Bullhorn({ s }: { s: OssState }) {
   const waiting = Q.lines(s).filter((l) => l.status === "approved" && !l.item);
   const byEvent = useMemo(() => { const m = new Map<string, Q.Line[]>(); waiting.forEach((l) => m.set(l.event.id, (m.get(l.event.id) || []).concat([l]))); return Array.from(m); }, [s]);
-  const batches = s.batches.slice().reverse();
-  const unmapped = s.mappings.filter((m) => m.entityType === "worker" && m.status === "missing");
+  /* Sends with a blocked row first (they need someone), then newest first. */
+  const batches = s.batches.slice().reverse().sort((a, b) => Number(Q.batchSummary(s, b.id).blocked > 0) - Number(Q.batchSummary(s, a.id).blocked > 0));
+  const items = s.items;
+  const accepted = items.filter((i) => i.state === "accepted");
+  const queued = items.filter((i) => i.state === "queued");
+  const sentN = items.filter((i) => i.attempts.length > 0).length;
+  const blocked = items.filter((i) => i.state === "blocked" || i.state === "failed");
+  const last = items.flatMap((i) => i.attempts.map((a) => a.at)).sort().pop();
+  const acceptedMin = accepted.reduce((n, i) => n + i.snapshot.payableMin, 0);
+  const [allB, setAllB] = useState(false);
+  const deskOfBatch = (b: (typeof s.batches)[number]) => (DESKS as readonly string[]).includes(b.scope) ? b.scope : (() => { const it = s.items.find((i) => i.batchId === b.id); return it ? Q.deskOf(Q.eventOf(s, it.snapshot.eventId)) : "Dublin events desk"; })();
+  const byDesk = DESKS.map((d) => ({ d, min: accepted.filter((i) => Q.deskOf(Q.eventOf(s, i.snapshot.eventId)) === d).reduce((n, i) => n + i.snapshot.payableMin, 0), rows: accepted.filter((i) => Q.deskOf(Q.eventOf(s, i.snapshot.eventId)) === d).length })).filter((x) => x.rows);
+  const deskPeak = Math.max(1, ...byDesk.map((x) => x.min));
+  const send = (eid: string, l: Q.Line[]) => { const r = run(E.createBatch, l.map((x) => x.asg.id), Q.eventOf(s, eid).name + ", " + fmtDayMonth(l[0].shift.start), eid); if (r.ok) { run(E.sendBatch, r.data.id); setTimeout(() => openDrawer("batch", r.data.id), 50); } };
   return (
-    <Page title="Bullhorn handover" sub={<>Approved hours leave through a <b>simulated</b> adapter: Draft, Ready, Queued, Sending, then Accepted, Blocked or Failed. Each row has a stable transfer key, so retries never duplicate. A receipt is not payment.</>}
-      scope={<St tone="sim">Simulated handover</St>}>
-      {byEvent.length > 0 && <Card title="Approved, not yet sent" pad={false}>
-        <Table rows={byEvent} rowKey={([e]) => e}
-          cols={[{ key: "e", label: "Booking", render: ([e]) => Q.eventOf(s, e).name }, { key: "n", label: "Lines", num: true, render: ([, l]) => l.length },
-            { key: "p", label: "Payable", num: true, render: ([, l]) => fmtHM(Q.totals(l).payable) },
-            { key: "m", label: "Mappings", render: ([, l]) => l.every((x) => x.mapped) ? <S s="Mapped" /> : <St tone="warn">{l.filter((x) => !x.mapped).length} missing</St> },
-            { key: "a", label: "", render: ([e, l]) => <Btn size="sm" kind="primary" icon={I.send} onClick={() => { const r = run(E.createBatch, l.map((x) => x.asg.id), Q.eventOf(s, e).name + ", " + fmtDayMonth(l[0].shift.start), e); if (r.ok) { run(E.sendBatch, r.data.id); openTo(r.data.id); } }}>Create batch and send</Btn> }]} />
-      </Card>}
-      <Card title="Batches" pad={false} style={{ marginTop: byEvent.length ? 14 : 0 }}>
-        <Table rows={batches} rowKey={(b) => b.id} onRow={(b) => openDrawer("batch", b.id)}
-          cols={[{ key: "id", label: "Batch", render: (b) => <span className="strong">{b.id}</span> }, { key: "l", label: "Scope", render: (b) => b.label },
-            { key: "n", label: "Rows", num: true, render: (b) => Q.batchSummary(s, b.id).items.length },
-            { key: "a", label: "Accepted", num: true, render: (b) => { const x = Q.batchSummary(s, b.id); return x.accepted + " · " + fmtHM(x.acceptedMin); } },
-            { key: "bl", label: "Blocked", num: true, render: (b) => { const x = Q.batchSummary(s, b.id); return x.blocked ? <St tone="bad">{x.blocked} · {fmtHM(x.blockedMin)}</St> : "0"; } },
-            { key: "t", label: "Total payable", num: true, render: (b) => fmtHM(Q.batchSummary(s, b.id).totalMin) },
-            { key: "w", label: "Last attempt", nowrap: true, render: (b) => { const at = Q.batchSummary(s, b.id).items.flatMap((i) => i.attempts.map((a) => a.at)).sort().pop(); return at ? when(at) : "—"; } }]} />
-      </Card>
-      <div className="oss-grid oss-g2" style={{ marginTop: 14 }}>
-        <Card title="Mappings needing a person" pad={false}>
-          <Table rows={unmapped} rowKey={(m) => m.id} empty={<Empty title="All workers mapped" />}
-            cols={[{ key: "w", label: "Worker", render: (m) => <WorkerLink s={s} id={m.localId} /> }, { key: "n", label: "Note", render: (m) => <span className="oss-small oss-dim">{m.note}</span> },
-              { key: "a", label: "", render: (m) => <Btn size="sm" onClick={() => openDrawer("mapping", m.localId)}>Resolve</Btn> }]} />
-        </Card>
-        <Card title="Field ownership (proposed, to validate)">
-          <div className="oss-small" style={{ lineHeight: 1.65 }}>
-            <b>Bullhorn keeps</b> master client, contact and candidate identifiers.<br />
-            <b>OSS Pulse owns</b> availability, event operations, invitations and replies, journey and clock evidence, and hour approvals.<br />
-            <b>To agree</b>: assignment, job or placement mapping and the approved-hours destination. Nothing silently overwrites Bullhorn data.
+    <Page eyebrow="Bullhorn handover" title="Approved hours into Bullhorn" sub="Only approved lines are sent. Each row is matched to a Bullhorn candidate and client, and every send gets a receipt you can check.">
+      <section className="ops-pipe">
+        <div className="ops-pipe-lead">
+          <span className="oss-eyebrow">In Bullhorn</span>
+          <b>{acceptedMin >= 6000 ? Math.floor(acceptedMin / 60).toLocaleString("en-IE") + "h" + (acceptedMin % 60 ? " " + (acceptedMin % 60) + "m" : "") : fmtHM(acceptedMin)}</b>
+          <span className="oss-small oss-dim">{accepted.length} row{accepted.length === 1 ? "" : "s"} accepted · {acceptedMin.toLocaleString("en-IE")} min</span>
+          <span className="oss-tiny oss-muted">{last ? "Last sync " + fmtDate(last) + ", " + fmtTime(last) : "No sends yet"}</span>
+        </div>
+        <div className="ops-pipe-steps">
+          <Steps steps={[
+            { label: "Approved, not sent", n: waiting.length, sub: waiting.length ? fmtHM(Q.totals(waiting).payable) : "Nothing waiting", tone: waiting.length ? "accent" : undefined, on: waiting.length > 0 },
+            { label: "Queued", n: queued.length, sub: "Waiting on Bullhorn" },
+            { label: "Sent", n: sentN, sub: "With a receipt per row" },
+            { label: "Accepted", n: accepted.length, tone: accepted.length ? "ok" : undefined, sub: "In Bullhorn" },
+            { label: "Blocked", n: blocked.length, tone: blocked.length ? "bad" : undefined, sub: blocked.length ? "Needs a candidate match" : "Nothing stuck" }
+          ]} />
+        </div>
+      </section>
+      <div className="oss-grid oss-main-side" style={{ alignItems: "start" }}>
+        <div className="oss-stack">
+          {blocked.length > 0 && <div className="ops-stuck">
+            <div className="ops-stuck-h"><Icon d={I.alert} size={16} /><b>Hours that can't land yet</b><span className="oss-tiny">Payroll cut-off Fri 27 Nov</span></div>
+            {blocked.map((i) => <div key={i.id} className="ops-stuck-r"><Av name={Q.nameOf(s, i.snapshot.workerId)} /><span className="grow"><b>{Q.nameOf(s, i.snapshot.workerId)}</b><span>{(i.error || "No Bullhorn candidate match")} · {fmtHM(i.snapshot.payableMin)} · {i.batchId}</span></span>
+              <Btn size="sm" kind="primary" onClick={() => openDrawer("mapping", i.snapshot.workerId)}>Match and retry</Btn></div>)}
+          </div>}
+          {byEvent.length > 0 && <Card title="Ready to send" meta="Approved hours grouped by event" icon={I.send} flush>
+            <div className="oss-rows">{byEvent.map(([eid, l]) => (
+              <Row key={eid} lead={<RIcon d={I.doc} tone="info" />} title={Q.eventOf(s, eid).name} sub={l.length + " lines · " + fmtHM(Q.totals(l).payable) + " payable" + (l.some((x) => !x.mapped) ? " · " + l.filter((x) => !x.mapped).length + " not matched yet" : "")}
+                end={<Btn size="sm" kind="primary" icon={I.send} onClick={() => send(eid, l)}>Send to Bullhorn</Btn>} />))}
+            </div>
+          </Card>}
+          <div className="oss-rule"><span>Sends</span></div>
+          <div className="ops-batches">
+            {batches.slice(0, allB ? 200 : 12).map((b) => { const x = Q.batchSummary(s, b.id); const bd = deskOfBatch(b); const at = x.items.flatMap((i) => i.attempts.map((a) => a.at)).sort().pop(); const n = x.items.length || 1; return (
+              <button key={b.id} className={"ops-batch" + (x.blocked ? " has-bad" : "")} onClick={() => openDrawer("batch", b.id)}>
+                <span className="ops-batch-h"><span className="id">{b.id}</span><span className="when">{at ? when(at) : "Not sent"}</span></span>
+                <b className="ops-batch-t">{b.label}</b>
+                <span className="nx-desk sm nx-bdesk"><i style={{ background: deskC(bd) }} />{DESK_SHORT[bd] || bd}</span>
+                <span className="ops-batch-fig"><b>{x.items.length}</b> rows<span className="sep" /><b>{fmtHM(x.totalMin)}</b> payable</span>
+                <span className="ops-batch-min">{x.totalMin.toLocaleString("en-IE")} min</span>
+                <span className="ops-batch-bar" aria-hidden="true"><i className="ok" style={{ width: (x.accepted / n) * 100 + "%" }} /><i className="q" style={{ width: (x.queued / n) * 100 + "%" }} /><i className="bad" style={{ width: ((x.blocked + x.failed) / n) * 100 + "%" }} /></span>
+                <span className="ops-batch-st"><St tone="ok">{x.accepted} accepted</St>{x.queued > 0 && <St tone="info">{x.queued} queued</St>}{x.blocked + x.failed > 0 && <St tone="bad">{x.blocked + x.failed} blocked</St>}</span>
+              </button>); })}
+            {batches.length > 12 && !allB && <button className="nx-more" onClick={() => setAllB(true)}>Show all {batches.length} sends</button>}
+            {!batches.length && <div className="oss-empty"><b>Nothing sent yet</b></div>}
           </div>
-          <div className="oss-note" style={{ marginTop: 10 }}>Bullhorn's public docs list Candidate, ClientCorporation, ClientContact, JobOrder and Placement. That does not establish OSS's modules, fields or an approved-hours write route; those need OSS's configuration and testing. <RecLink kind="batch" id="BH-1111-01">Open BH-1111-01</RecLink></div>
-        </Card>
+        </div>
+        <div className="oss-stack">
+          {byDesk.length > 0 && <Card title="In Bullhorn by desk" meta="Accepted payable hours" icon={I.chart}>
+            <div className="nx-deskbars">{byDesk.sort((a, b) => b.min - a.min).map((x) => (
+              <div key={x.d} className="r"><span className="nm"><i style={{ background: deskC(x.d) }} />{DESK_SHORT[x.d]}</span><span className="bar"><i style={{ width: (x.min / deskPeak) * 100 + "%", background: deskC(x.d) }} /></span><b>{fmtHM(x.min)}</b><span className="n">{x.rows} rows</span></div>))}</div>
+          </Card>}
+          <Card title="What goes across" meta="One row per approved line" icon={I.list}>
+            <div className="oss-list">{FIELDS.map(([k, v]) => <div key={k} className="oss-row oss-small"><b className="oss-ink" style={{ width: 120, flex: "none" }}>{k}</b><span className="oss-dim">{v}</span></div>)}</div>
+          </Card>
+          <Card title="How it stays clean" icon={I.shield}>
+            <div className="oss-small" style={{ lineHeight: 1.65, color: "var(--body)" }}>Retries resend only the rows that failed, with the same transfer key, so nothing is counted twice. Reopening approved hours creates a new version and a new row. Sage invoicing and Bright payroll carry on from Bullhorn as they do today.</div>
+            <div className="oss-tiny oss-muted" style={{ marginTop: 10 }}>Bullhorn is simulated in this demo.</div>
+          </Card>
+        </div>
       </div>
     </Page>
   );
 }
-function openTo(id: string) { setTimeout(() => openDrawer("batch", id), 50); }
-export { navigate };
+void setUi;

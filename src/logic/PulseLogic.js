@@ -67,10 +67,12 @@ import {
 } from "./data";
 import { getState as ossState, subscribe as ossSubscribe, registerNav, setTab as ossSetTab, navigate as ossNavigate, openDrawer as ossOpenDrawer } from "../oss/store";
 import { MODULES, tabOf } from "../oss/modules";
+import { todos as ossTodos, AREAS as OSS_AREAS, areaCount as ossAreaCount } from "../oss/todo";
 import { answer as ossAnswer, SEEDED_QUESTIONS } from "../oss/answers";
 import * as OQ from "../oss/selectors";
-import { fmtDate as oFmtDate, fmtTime as oFmtTime, fmtHM as oFmtHM, hourOf as oHourOf, relTime as oRelTime } from "../oss/time";
+import { fmtDate as oFmtDate, fmtTime as oFmtTime, fmtHM as oFmtHM, hourOf as oHourOf, relTime as oRelTime, dayKey as oDayKey } from "../oss/time";
 import { AGENTS as OSS_AGENTS } from "../oss/engine";
+import { dayPulse as ossDayPulse, weekPulse as ossWeekPulse } from "../oss/pages/Dashboard";
 
 /* ── Locked layout ──────────────────────────────────────────────────────────
    These two rules hold for every client build, whatever data.js says:
@@ -107,8 +109,8 @@ export default class PulseLogic extends DCLogic {
             newRecOpen:false, newRecName:"", newRecTemplate:"Field sheet", newRecCat:"All",
             opsFilter:"all", opsOff:{}, opsOpen:null, opsScope:"week", opsDay:26, opsOrder:null, opsDrag:null,
             opsBuilderOpen:false, opsBuilderMode:"workflow", builderText:"", builderGenerated:false,
-            railOpen:true, barOpen:true, chatRailPinned:false, widgetEdit:false, widgets:["inbox","work","activity"],
-            kpiEdit:false, kpiKeys:["required","confirmed","unfilled","awaiting","handover"],
+            railOpen:typeof window === "undefined" || window.innerWidth >= 768, navDrawer:false, barOpen:true, chatRailPinned:false, widgetEdit:false, widgets:["inbox","work","activity"],
+            kpiEdit:false, kpiKeys:["required","confirmed","unfilled","awaiting","hours"],
             aspect:"sales", filterMenuOpen:false, customFilter:"", extraFilters:[],
             workWidget:"queue", miniOpen:false, miniThread:[], miniDraft:"", miniTab:"chat", miniTone:"plain", miniWorkOpen:"tasks",
             agents:AGENT_DEFS, agentId:"briefing", groupNames:{}, agentQuery:"", agentDraft:"", agentExtra:{},
@@ -1205,14 +1207,15 @@ export default class PulseLogic extends DCLogic {
       this._startLoop(stale);
     }, 250);
     this._startLoop(true);
-    this._resize = () => this.setState({w: window.innerWidth});
+    /* On a phone-width window the expanded rail would squeeze the page: fold it when crossing below 768px. */
+    this._resize = () => this.setState(prev => ({w: window.innerWidth, railOpen: window.innerWidth < 768 && prev.w >= 768 ? false : prev.railOpen}));
     window.addEventListener("resize", this._resize);
     this._key = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k"){
         e.preventDefault();
         if (this.state.paletteOpen) this.setState({paletteOpen:false, query:"", palSel:0}); else this.openPalette();
       }
-      if (e.key === "Escape") this.setState({paletteOpen:false, showNotifs:false});
+      if (e.key === "Escape") this.setState({paletteOpen:false, showNotifs:false, navDrawer:false});
     };
     window.addEventListener("keydown", this._key);
     this._paste = (e) => {
@@ -1261,7 +1264,7 @@ export default class PulseLogic extends DCLogic {
     const order = NAV.filter(n => !n.divider).map(n => n.page).concat(["Settings"]);
     const from = order.indexOf(this.state.page), to = order.indexOf(page);
     if (from > -1 && to > -1 && from !== to) this.setState(p => ({navDir: to > from ? 1 : -1, navSeq:(p.navSeq || 0) + 1}));
-    this.setState({page, open:null, showNotifs:false, filterMenuOpen:false});
+    this.setState({page, open:null, showNotifs:false, filterMenuOpen:false, navDrawer:false});
     if (page === "Dashboard") this.startKpiCount();
   }
   toggleIn(key, value){
@@ -1386,8 +1389,10 @@ export default class PulseLogic extends DCLogic {
         + "width:calc((100% - 8px) / " + n + ");transform:translateX(" + (i * 100) + "%);"
         + "border-radius:var(--r-ctl,9px);background-color:" + fill + ";transition:" + SLIDE + ";" + glow;
     };
-    const railStyle = (active) => "position:relative;width:" + (st.railOpen ? "100%" : "44px") + ";height:42px;flex:none;display:flex;align-items:center;"
-      + (st.railOpen ? "gap:13px;justify-content:flex-start;padding:0 14px;font-size:14px;" : "gap:0;justify-content:center;")
+    // Below 768px the rail is an off-canvas drawer and always shows its labels.
+    const railWide = st.railOpen || st.w < 768;
+    const railStyle = (active) => "position:relative;width:" + (railWide ? "100%" : "44px") + ";height:42px;flex:none;display:flex;align-items:center;"
+      + (railWide ? "gap:13px;justify-content:flex-start;padding:0 14px;font-size:14px;" : "gap:0;justify-content:center;")
       + "border:0;border-radius:14px;cursor:pointer;overflow:visible;"
       + "transition:background .42s var(--ease),color .35s var(--ease),box-shadow .42s var(--ease),transform .3s cubic-bezier(.16,1.4,.3,1);"
       + (active ? "background:none;color:var(--rail-active-ink,var(--accent))"
@@ -1413,7 +1418,7 @@ export default class PulseLogic extends DCLogic {
       + (shown ? "visibility:visible" : "visibility:hidden;opacity:0;transform:translate(-12px,-50%) scale(.92)")
 
     // Open rail shows labels inline; collapsed rail shows them as the hover pill — never both.
-    const railOpen = st.railOpen;
+    const railOpen = railWide;
     // Collapsed: the label leaves the flex row entirely — otherwise its gap decentres the icon.
     const inlineStyle = (hov, act) => railOpen
       ? "flex:1;min-width:0;font-size:13px;text-align:left;white-space:nowrap;overflow:hidden;opacity:1;"
@@ -1422,7 +1427,7 @@ export default class PulseLogic extends DCLogic {
         + "transition:transform .5s cubic-bezier(.22,1.2,.36,1),font-weight .2s var(--ease)"
       : "display:none";
     const nav = NAV.map((n, idx) => n.divider
-      ? {isDivider:true, isItem:false}
+      ? {isDivider:true, isItem:false, hasLabel: !!(n.label && railOpen), label: n.label || "", lineStyle: railOpen && n.label ? "display:none" : "width:20px;height:1px;background:var(--track);margin:7px 0"}
       : {isItem:true, isDivider:false, label:n.label, hint: railOpen ? (n.hint || "") : "", d:ICONS[n.icon],
          dot: n.dot === true && openKeys.length > 0,
          dotStyle: "position:absolute;top:5px;" + (railOpen ? "left:30px" : "right:6px")
@@ -1751,11 +1756,11 @@ export default class PulseLogic extends DCLogic {
     const ontoSel = ONTO_NODES.find(n => n[0] === st.ontoNode) || ONTO_NODES[0];
 
     const HERO = {
-      contacts:{eyebrow:"CLIENTS & CONTACTS · " + CONTACTS.length + " SAMPLE RECORDS", title:"Clients and contacts",
-        blurb:"Office personas and fictional client contacts. Client and contact records stay owned by Bullhorn; this is not a sales CRM.",
+      contacts:{eyebrow:"CLIENTS & CONTACTS · " + CONTACTS.length + " RECORDS", title:"Clients and contacts",
+        blurb:"The OSS office team and client contacts. Client and contact records stay owned by Bullhorn.",
         placeholder:"Try “Quayside”, “coordinator”, “client”", kind:"KEYWORD", scroll:"SCROLL FOR THE FULL LIST",
         suggestions:["client","coordinator","Quayside","Aiken"]},
-      files:{eyebrow:"FILES · " + FILE_TREE.filter(r => r.type === "file").length + " SAMPLE DOCUMENTS",
+      files:{eyebrow:"FILES · " + FILE_TREE.filter(r => r.type === "file").length + " DOCUMENTS",
         title:"Files", blurb:"Booking briefs, compliance registers and handover reconciliations. All synthetic placeholders.",
         placeholder:"Search inside every document…", kind:"FULL TEXT", scroll:"SCROLL FOR THE VIEWER",
         suggestions:["Manual Handling","3Arena","blocked","pending"]},
@@ -2907,17 +2912,20 @@ export default class PulseLogic extends DCLogic {
       {group:"Actions", scope:"Actions", items:[
         {title:"Start a new conversation", meta:"Clears the current thread", hint:"ACTION", glyph:"action",
           go: () => { clearInterval(this._t); this.setState({page:"Home", thread:[], typed:0, draft:""}); }},
-        {title:"Fill the 3Arena gaps", meta:"Staffing · allocation", hint:"ACTION", glyph:"action", go: navTo("Staffing", "allocation", {kind:"event", id:"EVT-001"})},
-        {title:"Review hours waiting for approval", meta:"Timesheets · approvals", hint:"ACTION", glyph:"action", go: navTo("Timesheets", "approvals")},
-        {title:"Resolve blocked Bullhorn rows", meta:"Timesheets · handover (simulated)", hint:"ACTION", glyph:"action", go: navTo("Timesheets", "handover")},
+        {title:"Fill the 3Arena gaps", meta:"Staffing · allocate", hint:"ACTION", glyph:"action", go: navTo("Staffing", "allocate", {kind:"event", id:"EVT-001"})},
+        {title:"Message available staff about urgent cover", meta:"Messages · new message", hint:"ACTION", glyph:"action", go: navTo("Messages", "compose")},
+        {title:"Register a new employee on site", meta:"Staff · register", hint:"ACTION", glyph:"action", go: navTo("Staff", "register")},
+        {title:"Review hours waiting for approval", meta:"Timesheets · review", hint:"ACTION", glyph:"action", go: navTo("Timesheets", "review")},
+        {title:"Export this week's client report", meta:"Reports · client report", hint:"ACTION", glyph:"action", go: navTo("Reports", "client")},
+        {title:"Check the Bullhorn handover", meta:"Timesheets · Bullhorn", hint:"ACTION", glyph:"action", go: navTo("Timesheets", "bullhorn")},
         {title:themeAction, meta:"Appearance", hint:"ACTION", glyph:"action",
           go: () => this.setState(p => p.theme === "light" ? {theme: p.darkTheme || this.props.theme || "harbour"} : {theme:"light", darkTheme:p.theme})}
       ]},
       {group:"Agents", scope:"Agents", items:OSS_AGENTS.map(a => ({title:a.name, meta:a.job, hint:"AGENT", glyph:"agent", go: navTo("Agents", "agents")}))},
-      {group:"Work", scope:"Work", items:os.tasks.filter(x => x.status !== "done").map(x => ({title:x.title, meta:OQ.nameOf(os, x.ownerId) + " · due " + oFmtDate(x.due) + " " + oFmtTime(x.due), hint:"TASK", glyph:"task", go: navTo("Work", "board")}))},
-      {group:"Records", scope:"Records", items:os.workers.map(w => ({title:w.name, meta:w.id + " · " + w.roles.join(", ") + " · " + w.locality, hint:"WORKER", glyph:"person",
+      {group:"Tasks", scope:"Tasks", items:os.tasks.filter(x => x.status !== "done").map(x => ({title:x.title, meta:OQ.nameOf(os, x.ownerId) + " · due " + oFmtDate(x.due) + " " + oFmtTime(x.due), hint:"TASK", glyph:"task", go: navTo("Dashboard", "overview")}))},
+      {group:"Records", scope:"Records", items:os.workers.map(w => ({title:w.name, meta:w.roles.join(", ") + " · " + w.locality, hint:"EMPLOYEE", glyph:"person",
         go: () => { ossOpenDrawer("worker", w.id); }}))
-        .concat(os.events.map(e => ({title:e.name, meta:e.id + " · " + OQ.clientOf(os, e.clientId).name + " · " + e.date, hint:"EVENT", glyph:"org", go: () => ossOpenDrawer("event", e.id)})))
+        .concat(os.events.map(e => ({title:e.name, meta:OQ.clientOf(os, e.clientId).name + " · " + oFmtDate(e.date + "T12:00:00Z"), hint:"EVENT", glyph:"org", go: navTo("Events", "upcoming", {kind:"event", id:e.id})})))
         .concat(os.clients.map(c => ({title:c.name, meta:c.sector, hint:"CLIENT", glyph:"org", go: () => ossOpenDrawer("client", c.id)})))},
       {group:"Pages", scope:"Pages", items:Object.keys(MODULES).flatMap(pg => MODULES[pg].tabs.map(t => ({title:pg + " · " + t.label, meta:"Go to page", hint:"PAGE", glyph:"page", go: navTo(pg, t.id)})))}
     ].filter(Boolean);
@@ -2925,7 +2933,7 @@ export default class PulseLogic extends DCLogic {
     const match = g => g.items.filter(i => !ql || (i.title + " " + i.meta).toLowerCase().includes(ql));
     const scopeCounts = {All:0};
     SEARCH.forEach(g => { const n = match(g).length; scopeCounts.All += n; if (g.scope !== "All") scopeCounts[g.scope] = (scopeCounts[g.scope] || 0) + n; });
-    const palScopes = ["All","Actions","Agents","Work","Records","Pages"].map(name => {
+    const palScopes = ["All","Actions","Agents","Tasks","Records","Pages"].map(name => {
       const on = scope === name;
       return {label:name, count:scopeCounts[name] || 0,
         style:"flex:none;display:flex;align-items:center;gap:6px;height:26px;padding:0 11px;border-radius:var(--r-ctl,9px);cursor:pointer;font-size:12px;transition:background .2s var(--ease),color .2s var(--ease),border-color .2s var(--ease);"
@@ -2983,25 +2991,26 @@ export default class PulseLogic extends DCLogic {
     const KITS = {
       Home: [
         {title:"What needs attention before Saturday?", meta:"Ask · briefing", icon:ICONS.helios, go: () => { clearInterval(this._t); this.setState({paletteOpen:false, query:"", page:"Home"}); this.ask("What needs attention before Saturday?"); }},
-        {title:"3Arena allocation", meta:"Staffing", icon:ICONS.navStaffing, go: navTo("Staffing", "allocation", {kind:"event", id:"EVT-001"})},
+        {title:"3Arena allocation", meta:"Staffing", icon:ICONS.navStaffing, go: navTo("Staffing", "allocate", {kind:"event", id:"EVT-001"})},
         {title:"Timesheet review", meta:"Timesheets", icon:ICONS.navTimesheets, go: navTo("Timesheets", "review")},
-        {title:"My work", meta:"Tasks", icon:ICONS.work, go: navTo("Work", "mine")}
+        {title:"Live attendance", meta:"Attendance", icon:ICONS.navLive, go: navTo("Attendance", "board")}
       ]
     };
     const palPageRaw = KITS[page] || [
-      {title:"Ask about this page", meta:"Answers come from the sample records", icon:ICONS.helios, go: () => { this.setState({paletteOpen:false, query:"", page:"Home"}); this.ask("What needs attention before Saturday?"); }},
-      {title:"Staffing", meta:"Allocation", icon:ICONS.navStaffing, go: navTo("Staffing", "allocation")},
-      {title:"Live Operations", meta:"Today", icon:ICONS.navLive, go: navTo("Live Operations", "today")},
+      {title:"Ask about this page", meta:"Answers come from the records", icon:ICONS.helios, go: () => { this.setState({paletteOpen:false, query:"", page:"Home"}); this.ask("What needs attention before Saturday?"); }},
+      {title:"Staffing", meta:"Allocate", icon:ICONS.navStaffing, go: navTo("Staffing", "allocate")},
+      {title:"Attendance", meta:"Live board", icon:ICONS.navLive, go: navTo("Attendance", "board")},
       {title:"Records", meta:"Every record", icon:ICONS.navRecords, go: jump("Records")}
     ];
     const FREQ = [
-      {title:"3Arena: arena crew", count:"", icon:ICONS.navEvents, go: () => ossOpenDrawer("event", "EVT-001")},
+      {title:"3Arena: arena crew", count:"", icon:ICONS.navEvents, go: navTo("Events", "upcoming", {kind:"event", id:"EVT-001"})},
       {title:"Replacements", count:"", icon:ICONS.navStaffing, go: navTo("Staffing", "replacements")},
-      {title:"Exceptions", count:"", icon:ICONS.navLive, go: navTo("Live Operations", "exceptions")},
-      {title:"Bullhorn handover", count:"", icon:ICONS.navTimesheets, go: navTo("Timesheets", "handover")}
+      {title:"Exceptions", count:"", icon:ICONS.navLive, go: navTo("Attendance", "exceptions")},
+      {title:"Bullhorn handover", count:"", icon:ICONS.navTimesheets, go: navTo("Timesheets", "bullhorn")}
     ];
     const JUMPS = [
       {title:"Home", icon:ICONS.navHome, go: jump("Home")},
+      {title:"Dashboard", icon:ICONS.navDash, go: jump("Dashboard")},
       {title:"Events", icon:ICONS.navEvents, go: jump("Events")},
       {title:"Staffing", icon:ICONS.navStaffing, go: jump("Staffing")},
       {title:"Timesheets", icon:ICONS.navTimesheets, go: jump("Timesheets")},
@@ -3094,7 +3103,7 @@ export default class PulseLogic extends DCLogic {
         seg("Home", page === "Home", () => this.go("Home")),
         seg("Dashboard", page === "Dashboard", () => this.go("Dashboard"))
       ];
-      contextHint = page === "Home" ? "HOME · DEMO SCENARIO" : "DASHBOARD";
+      contextHint = page === "Home" ? "HOME · OSS EVENTS" : "DASHBOARD";
       searchHint = page === "Dashboard" ? "Search the dashboard" : "Search every record you can see";
     } else if (page === "Agents"){
       contextNav = [];
@@ -3152,12 +3161,24 @@ export default class PulseLogic extends DCLogic {
       rec: recModel, tree: treeModel, onto: ontoModel, newRec: newRecModel, graph: graphModel,
 
       /* rail */
-      railOuter: "position:relative;z-index:2;width:" + (railOpen ? "252px" : "68px")
+      railOuter: st.w < 768
+        ? "position:fixed;z-index:96;top:0;bottom:0;left:0;width:min(300px,86vw);display:flex;flex-direction:column;align-items:stretch;"
+          + "gap:4px;padding:calc(18px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));"
+          + "background:var(--panel,var(--bg));border-right:1px solid var(--border);box-shadow:24px 0 60px rgba(0,0,0,.4);"
+          + "overflow-y:auto;overflow-x:hidden;scrollbar-width:none;overscroll-behavior:contain;"
+          + (st.navDrawer
+              ? "transform:translateX(0);visibility:visible;transition:transform .32s var(--ease),visibility 0s"
+              : "transform:translateX(-105%);visibility:hidden;transition:transform .28s var(--ease),visibility 0s linear .28s")
+        : "position:relative;z-index:2;width:" + (railOpen ? "252px" : "68px")
         + ";flex:none;display:flex;flex-direction:column;align-items:" + (railOpen ? "stretch" : "center")
         + ";gap:4px;padding:22px " + (railOpen ? "16px" : "0") + " 16px"
         + ";background:transparent;"
         + "overflow-y:auto;overflow-x:hidden;scrollbar-width:none;"
         + "transition:width .32s var(--ease),padding .32s var(--ease)",
+      isMobile: st.w < 768,
+      navDrawer: st.navDrawer && st.w < 768,
+      openDrawer: () => this.setState({navDrawer:true, showNotifs:false}),
+      closeDrawer: () => this.setState({navDrawer:false}),
       brandStyle: railOpen
         ? "flex:1;min-width:0;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;opacity:1"
         : "display:none",
@@ -3167,8 +3188,8 @@ export default class PulseLogic extends DCLogic {
       railOpen,
       railRowStyle: "display:flex;align-items:center;gap:10px;"
         + (railOpen ? "width:100%;padding:0 10px;" : "justify-content:center;width:40px;"),
-      railLabel: railOpen ? "Collapse sidebar" : "Expand sidebar",
-      toggleRail: () => this.setState(prev => ({railOpen: !prev.railOpen, hovered:null})),
+      railLabel: st.w < 768 ? "Close menu" : railOpen ? "Collapse sidebar" : "Expand sidebar",
+      toggleRail: () => this.setState(prev => (prev.w < 768 ? {navDrawer:false} : {railOpen: !prev.railOpen, hovered:null})),
       settingsInlineStyle: inlineStyle(st.railHov === "settings", page === "Settings"),
 
       /* header zones */
@@ -3208,7 +3229,7 @@ export default class PulseLogic extends DCLogic {
 
       /* dashboard */
       isDashboard: page === "Dashboard",
-      dashTitle: "OSS · event staffing",
+      dashTitle: tabOf(ossState(), "Dashboard") === "year" ? "OSS events · the year ahead" : "OSS events · this week",
       kpiEdit: st.kpiEdit,
       toggleKpiEdit: () => this.setState(prev => ({kpiEdit: !prev.kpiEdit})),
       kpiEditLabel: st.kpiEdit ? "Done" : "Edit KPIs",
@@ -3940,7 +3961,7 @@ export default class PulseLogic extends DCLogic {
       headerStyle: "flex:none;display:grid;align-items:center;gap:14px;padding:14px 22px 12px;border-bottom:1px solid var(--border);"
         + "grid-template-columns:minmax(0,1fr) " + (mid ? "minmax(150px,340px)" : "44px") + " minmax(0,1fr)",
       barOpen: st.barOpen,
-      railShut: !st.railOpen,
+      railShut: !railOpen,
       kpiBackdrop: this.props.dashboardBackdrop || this.props.kpiBackdrop || "#5f8f63",
       // One colour from App.tsx repaints the Records wash (and the New record
       // dialog). It is blended into the theme's own --bg, so the same colour
@@ -4358,13 +4379,14 @@ export default class PulseLogic extends DCLogic {
     const hero = OQ.eventCoverage(os, "EVT-001");
     const blockedMin = os.items.filter(i => i.state === "blocked").reduce((n, i) => n + i.snapshot.payableMin, 0);
     const KPI = {
-      required:{label:"Required positions", value:String(t.required), delta:"firm", hint:"next 7 days"},
-      confirmed:{label:"Confirmed", value:String(t.confirmed), delta:t.coverageLabel, hint:"coverage"},
-      unfilled:{label:"Unfilled", value:String(t.unfilled), delta:t.notInvited + " not invited", hint:"incl. awaiting"},
-      awaiting:{label:"Awaiting reply", value:String(t.awaiting), delta:"invitations", hint:"open"},
-      handover:{label:"Blocked handover", value:oFmtHM(blockedMin), delta:os.items.filter(i => i.state === "blocked").length + " rows", hint:"simulated"},
-      pending:{label:"Pending demand", value:String(OQ.pendingDemand(os).positions), delta:"positions", hint:"not in firm"},
-      exceptions:{label:"Open exceptions", value:String(OQ.openExceptions(os).length), delta:"attendance", hint:"to review"}
+      required:{label:"Positions booked", value:String(t.required), delta:t.events.length + " events", hint:"next 7 days"},
+      confirmed:{label:"Confirmed", value:String(t.confirmed), delta:t.coverageLabel, hint:"filled"},
+      unfilled:{label:"Still to fill", value:String(t.unfilled), delta:t.notInvited + " not invited", hint:"yet"},
+      awaiting:{label:"Awaiting reply", value:String(t.awaiting), delta:"offers", hint:"open"},
+      hours:{label:"Hours to approve", value:String(OQ.lines(os).filter(l => l.status === "ready" || l.status === "needs_review").length), delta:"timesheet", hint:"lines"},
+      handover:{label:"Not in Bullhorn", value:oFmtHM(blockedMin), delta:os.items.filter(i => i.state === "blocked").length + " rows", hint:"blocked"},
+      pending:{label:"Pending bookings", value:String(OQ.pendingDemand(os).positions), delta:"positions", hint:"not firm"},
+      exceptions:{label:"Attendance issues", value:String(OQ.openExceptions(os).length), delta:"open", hint:"to review"}
     };
     const keys = st.kpiKeys.filter(k => KPI[k]);
     const sweepRows = os.audit.slice(-6).reverse();
@@ -4401,20 +4423,39 @@ export default class PulseLogic extends DCLogic {
       themesList: THEMES.map(x => ({id:x.id, name: x.id === "harbour" ? "Harbour (OSS blue)" : x.id === "light" ? "Light (OSS blue)" : x.label})),
       setThemeId: (id) => this.setState({theme:id}),
       askQ: (q) => this.ask(q),
-      dashTitle: "OSS · event staffing",
-      kpis: keys.map((k, ki) => ({label:KPI[k].label, value:this.countValue(KPI[k].value, ki), delta:KPI[k].delta, hint:KPI[k].hint,
+      dashTitle: page !== "Dashboard" ? "" : tabOf(os, "Dashboard") === "year" ? "OSS events · the year ahead" : tabOf(os, "Dashboard") === "executive" ? "OSS events · how the business is running" : (() => { const d = ossDayPulse(os); return "Today across OSS: " + d.events.length + " events" + (d.live.length ? ", " + d.live.length + " live now" : "") + ", " + d.rostered.toLocaleString("en-IE") + " crew rostered"; })(),
+      kpis: page === "Dashboard" && tabOf(os, "Dashboard") === "overview" ? (() => {
+        const all = ossTodos(os), urgent = all.filter(t => t.urgent).length, d = ossDayPulse(os), w = ossWeekPulse(os), n = (x) => x.toLocaleString("en-IE");
+        const tiles = [
+          {label:"EVENTS TODAY", value:String(d.events.length), delta:d.live.length + " live now", hint:"at " + d.venues + " venues", c:"var(--k-2)", dc:d.live.length ? "var(--ok)" : "var(--kpi-dim)"},
+          {label:"CREW ON SITE", value:n(d.onSite), delta:"of " + n(d.rostered) + " rostered today", hint:"", c:"var(--k-6)"},
+          {label:"FILLED THIS WEEK", value:w.t.coverageLabel, delta:n(w.t.confirmed) + " of " + n(w.t.required), hint:"positions", c:"var(--ok)", dc:"var(--ok)"},
+          {label:"HOURS APPROVED", value:n(Math.round(w.approvedMin / 60)) + "h", delta:n(w.inBh) + " rows in Bullhorn", hint:"this week", c:"var(--k-1)"},
+          {label:"WAITING ON YOU", value:String(all.length), delta:urgent + " urgent", hint:"to-dos", c:"#F6881F", dc:urgent ? "#F6881F" : "var(--kpi-dim)"}];
+        return tiles.map((k, ki) => ({label:k.label, value:this.countValue(k.value, ki), delta:k.delta, hint:k.hint, c:k.c,
+        bg:"var(--kpi-card)", border:"var(--kpi-card)", ink:"var(--kpi-ink)", deltaColor: k.dc || "var(--kpi-dim)", arrow:"", arrowStyle:"display:none",
+        valueStyle:"font-size:30px;font-weight:500;letter-spacing:-1px;margin-top:7px;line-height:1;font-variant-numeric:tabular-nums;animation:kpiRoll .62s var(--ease) " + (ki * 70) + "ms both",
+        remove: () => {}})); })() : keys.map((k, ki) => ({label:KPI[k].label, value:this.countValue(KPI[k].value, ki), delta:KPI[k].delta, hint:KPI[k].hint,
         bg:"var(--kpi-card)", border:"var(--kpi-card)", ink:"var(--kpi-ink)", deltaColor:"var(--kpi-dim)", arrow:"", arrowStyle:"display:none",
         valueStyle:"font-size:22px;font-weight:500;letter-spacing:-.8px;margin-top:7px;line-height:1;font-variant-numeric:tabular-nums;animation:kpiRoll .62s var(--ease) " + (ki * 70) + "ms both",
         remove: () => this.toggleIn("kpiKeys", k)})),
-      kpiColumns: String(Math.max(1, keys.length)),
+      kpiColumns: page === "Dashboard" && tabOf(os, "Dashboard") === "overview" ? "5" : String(Math.max(1, keys.length)),
+      showKpiBand: tabOf(os, "Dashboard") === "overview",
+      dashEyebrow: tabOf(os, "Dashboard") === "overview" ? "CONTROL PANEL · ALL SIX DESKS · AS OF " + oFmtDate(os.clock).toUpperCase() + ", " + oFmtTime(os.clock) : tabOf(os, "Dashboard") === "executive" ? "EXECUTIVE · LAST 90 DAYS AND THIS WEEK" : "PLANNING · NOVEMBER 2026 TO OCTOBER 2027",
       kpiChoices: Object.keys(KPI).filter(k => keys.indexOf(k) < 0).map(k => ({label:KPI[k].label, add: () => this.toggleIn("kpiKeys", k)})),
       noKpiChoices: Object.keys(KPI).every(k => keys.indexOf(k) > -1),
       greetingPrefix: g, greetingName: "Shane",
-      homeSubline: "Ask about bookings, rosters, attendance or hours. Sample data, " + oFmtDate(os.clock) + " " + oFmtTime(os.clock) + ".",
-      approvalsPill: hero.unfilled ? "3ARENA SAT · " + hero.confirmed + "/" + hero.required + " CONFIRMED · " + t.unfilled + " UNFILLED THIS WEEK" : "3ARENA SAT · " + hero.confirmed + "/" + hero.required + " CONFIRMED",
-      goApprovals: () => ossNavigate("Staffing", "allocation", {kind:"event", id:"EVT-001"}),
+      homeSubline: (() => {
+        const day = OQ.eventsOnDay(os, oDayKey(os.clock));
+        const nowMs = Date.parse(os.clock);
+        const live = day.filter(e => OQ.shiftsOfEvent(os, e.id).some(x => Date.parse(x.start) <= nowMs && Date.parse(x.end) > nowMs)).length;
+        const crew = day.reduce((n, e) => n + OQ.shiftsOfEvent(os, e.id).filter(x => oDayKey(x.start) === oDayKey(os.clock)).reduce((m, x) => m + OQ.shiftCoverage(os, x.id).confirmed, 0), 0);
+        return day.length + " events across Ireland today" + (live ? ", " + live + " live now" : "") + ", " + crew.toLocaleString("en-IE") + " crew booked. Ask about any of it.";
+      })(),
+      approvalsPill: hero.unfilled ? "3ARENA SATURDAY · " + hero.confirmed + "/" + hero.required + " CONFIRMED" : "3ARENA SATURDAY · FULLY STAFFED",
+      goApprovals: () => ossNavigate("Events", "upcoming", {kind:"event", id:"EVT-001"}),
       composerTools: [
-        {label:"Staffing", icon:ICONS.teams, go: () => ossNavigate("Staffing", "allocation")},
+        {label:"Staffing", icon:ICONS.teams, go: () => ossNavigate("Staffing", "allocate")},
         {label:"Timesheets", icon:ICONS.visits, go: () => ossNavigate("Timesheets", "review")},
         {label:"Records", icon:ICONS.navRecords, go: () => this.setState({page:"Records"})}
       ],
