@@ -456,7 +456,8 @@ export function line(s: OpsState, asgId: string): Line | null {
   const exp = s.exports.find((x) => x.asgIds.includes(a.id + ":" + version));
   const openEx = exceptionsOf(s, a.id).filter((e) => e.status === "open");
   let status: LineStatus;
-  if (!complete) status = inAt && ms(s.clock) < ms(sh.end) + s.rules.missedOutMin * 60000 ? "in_progress" : "missing";
+  // Until the missed clock-out check after the finish, an incomplete line is just a shift in progress.
+  if (!complete) status = ms(s.clock) < ms(sh.end) + s.rules.missedOutMin * 60000 ? "in_progress" : "missing";
   else if (exp) status = "exported";
   else if (office) status = "approved";
   else if (openEx.some((e) => BLOCKING.includes(e.type))) status = "review";

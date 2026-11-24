@@ -164,6 +164,7 @@ body { background: #f5f6f8; }
 .strip > * { min-width: 0; }
 .strip.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 @media (max-width: 1360px) { .strip.six { grid-template-columns: repeat(3, minmax(0, 1fr)); } .strip.six > *:nth-child(4) { border-left: 0; } .strip.six > *:nth-child(n + 4) { border-top: 1px solid var(--border); } }
+@media (max-width: 600px) { .strip.six { grid-template-columns: repeat(2, minmax(0, 1fr)); } .strip.six > * { border-left: 1px solid var(--border); border-top: 1px solid var(--border); } .strip.six > *:nth-child(odd) { border-left: 0; } .strip.six > *:nth-child(-n + 2) { border-top: 0; } }
 .strip span { font-size: 12.5px; color: var(--dim); }
 .strip .bad b { color: var(--bad); } .strip .warn b { color: var(--warn); } .strip .ok b { color: var(--ok); }
 

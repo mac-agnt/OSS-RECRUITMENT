@@ -125,7 +125,9 @@ function autoExpiry(d: OpsState, day: string) {
 }
 
 /* ── simulated crew (never the phone personas) ──────────────────────────── */
+/** Simulated crew act for everyone except the phone personas' own offers and the bookings marked manual. */
 const sims = (d: OpsState, workerId: string) => { const w = worker(d, workerId); return !w.persona && w.status === "active"; };
+const simsAsg = (d: OpsState, a: { workerId: string; manual?: boolean }) => !a.manual && worker(d, a.workerId).status === "active";
 interface Due { at: number; key: string; run: () => void }
 
 function arrivalFor(d: OpsState, asgId: string, start: number): number | null {
@@ -150,7 +152,7 @@ function dueCrew(d: OpsState, t0: number, t1: number, shifts: string[]): Due[] {
     const evId = m.threadId.startsWith("T-E") || m.threadId.startsWith("T-") ? d.threads.find((x) => x.id === m.threadId)?.eventId : undefined;
     if (!evId) continue;
     for (const w of m.to) {
-      if (!sims(d, w)) continue;
+      if (worker(d, w)?.status !== "active") continue;
       const k = "rep" + m.id + w;
       const delay = m.kind === "reconfirm" ? 5 + roll(k, 240) : 2 + roll(k, 55);
       const at = ms(m.at) + delay * M;
@@ -160,7 +162,7 @@ function dueCrew(d: OpsState, t0: number, t1: number, shifts: string[]): Due[] {
       if (!code) continue;
       out.push({ at, key: k, run: () => {
         const a = d.assignments.find((x) => x.workerId === w && x.status === "confirmed" && shift(d, x.shiftId).eventId === evId && ms(shift(d, x.shiftId).end) > at);
-        if (!a) return;
+        if (!a || a.manual) return;
         const sh = shift(d, a.shiftId);
         if (at >= ms(sh.start) || okClock(d, a.id, "in")) return;
         if (updatesOf(d, a.id).some((u) => ms(u.at) >= ms(m.at) && (m.kind === "reconfirm" ? u.code === "confirmed" : u.code !== "confirmed"))) return;
@@ -183,7 +185,7 @@ function dueCrew(d: OpsState, t0: number, t1: number, shifts: string[]): Due[] {
     const st = ms(sh.start), en = ms(sh.end);
     if (st > t1 + 15 * M || en + 15 * M < t0) continue;
     for (const a of asgsOfShift(d, shId)) {
-      if (a.status !== "confirmed" || !sims(d, a.workerId)) continue;
+      if (a.status !== "confirmed" || !simsAsg(d, a)) continue;
       const inC = okClock(d, a.id, "in");
       if (!inC) {
         if (clocksOf(d, a.id).some((c) => c.result === "pending_sync")) continue;
@@ -199,7 +201,7 @@ function dueCrew(d: OpsState, t0: number, t1: number, shifts: string[]): Due[] {
     }
   }
   // Offline captures sync after a while.
-  for (const c of d.clocks) if (c.result === "pending_sync" && sims(d, d.assignments.find((a) => a.id === c.asgId)!.workerId)) {
+  for (const c of d.clocks) if (c.result === "pending_sync" && simsAsg(d, d.assignments.find((a) => a.id === c.asgId)!)) {
     const at = ms(c.at) + 20 * M;
     if (inWin(at)) out.push({ at, key: "sync" + c.id, run: () => as(d, "system", () => syncOffline(d, c.asgId)) });
   }
@@ -248,7 +250,7 @@ const REASONS = ["Family emergency", "Sick this morning", "Lift fell through", "
 export function simulateDropouts(d: OpsState, shiftId: string, n = 3): Result {
   const sh = shift(d, shiftId);
   if (ms(sh.start) <= ms(d.clock)) return no("That shift has started.");
-  const list = confirmedOf(d, shiftId).filter((a) => sims(d, a.workerId) && !okClock(d, a.id, "in"));
+  const list = confirmedOf(d, shiftId).filter((a) => sims(d, a.workerId) && simsAsg(d, a) && !okClock(d, a.id, "in"));
   const byRole = list.filter((a) => a.role === sh.needs[0].role);
   const pickList = (byRole.length >= n ? byRole : list).slice().sort((a, b) => roll("drop" + a.id, 1000) - roll("drop" + b.id, 1000)).slice(0, n);
   if (!pickList.length) return no("No one to cancel on this shift.");
@@ -274,7 +276,7 @@ export function simulateArrivals(d: OpsState, shiftId: string): Result {
   if (ms(d.clock) < ms(sh.start) - d.rules.clockOpenMin * M) return no("Clock-in opens " + d.rules.clockOpenMin + " min before the start.");
   let n = 0;
   for (const a of confirmedOf(d, shiftId)) {
-    if (!sims(d, a.workerId) || okClock(d, a.id, "in") || a.flaggedAt) continue;
+    if (!simsAsg(d, a) || okClock(d, a.id, "in") || a.flaggedAt) continue;
     const res = as(d, "system", () => clockIn(d, a.id, { method: "gps", distanceM: 6 + roll("dist" + a.id, 38) }));
     if (res.ok) n++;
   }

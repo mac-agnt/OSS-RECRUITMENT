@@ -77,6 +77,8 @@ export interface Assignment {
   /** Set when the 45-minute check finds no reply; cleared by any reply. */
   flaggedAt?: string;
   endedAt?: string; endReason?: string; replaces?: ID; replacedBy?: ID;
+  /** Demo: only the phone persona acts on this booking (no simulated replies or clock-ins). */
+  manual?: boolean;
 }
 export interface Standby { id: ID; shiftId: ID; workerId: ID; role: string; order: number; at: string; source: "accepted_full" | "office" }
 

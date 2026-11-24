@@ -80,13 +80,15 @@ export default function CrewList() {
         <div style={{ width: 170 }}><Select sm label="Status" value={status} onChange={(v) => { setStatus(v); setPage(0); }} placeholder="Any status" options={[{ value: "active", label: "Active" }, { value: "pending_verification", label: "Not verified yet" }]} /></div>
         {filtersOn && <Btn size="sm" kind="ghost" onClick={() => { setQ(""); setSkill(""); setDay(""); setDocs(""); setCounty(""); setBooked(""); setHours(""); setStatus(""); setPage(0); }}>Clear</Btn>}
       </div>
-      <div className="row small dim" style={{ marginBottom: 8, gap: 14 }}>
+      <div className="row wrap small dim" style={{ marginBottom: 8, gap: 14 }}>
         <span>{shown.length.toLocaleString("en-IE")} workers</span>
+        <span className="hide-sm row wrap" style={{ gap: 14 }}>
         <span className="row" style={{ gap: 6 }}><span className="weekbar" aria-hidden="true" style={{ gridTemplateColumns: "12px" }}><i className="a" /></span>All day</span>
         <span className="row" style={{ gap: 6 }}><span className="weekbar" aria-hidden="true" style={{ gridTemplateColumns: "12px" }}><i className="d" /></span>Daytime</span>
         <span className="row" style={{ gap: 6 }}><span className="weekbar" aria-hidden="true" style={{ gridTemplateColumns: "12px" }}><i className="e" /></span>Evenings</span>
         <span className="row" style={{ gap: 6 }}><span className="weekbar" aria-hidden="true" style={{ gridTemplateColumns: "12px" }}><i className="x" /></span>Not available</span>
         <span className="row" style={{ gap: 6 }}><span className="weekbar" aria-hidden="true" style={{ gridTemplateColumns: "12px" }}><i /></span>Not set</span>
+        </span>
       </div>
       <div className="panel">
         <Table label="Crew" cols={cols} rows={shown.slice(page * 50, page * 50 + 50)} rowKey={(r) => r.w.id} onRow={(r) => go("/crew/" + r.w.id)}

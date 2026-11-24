@@ -261,6 +261,8 @@ export function buildRosters(s: OpsState, today: string) {
   const t4b = sh(t4, "Show crew", today, "17:30", "23:30", [{ role: "Event crew", count: 14 }, { role: "Steward", count: 6 }]);
   const t4aa = [place(PERSONAS.ciaran, t4a, "Stagehand"), ...fill(t4a, "Stagehand", 9)];
   const t4ba = [place(PERSONAS.tomasz, t4b, "Event crew"), ...fill(t4b, "Event crew", 12), ...fill(t4b, "Steward", 6)];
+  // The two bookings the presenter plays on the phone: no simulated replies or clock-ins for these.
+  t4aa[0].manual = true; t4ba[0].manual = true;
   standby(t4b, "Event crew", 3); standby(t4b, "Steward", 1);
   offerTo(t4b, "Event crew", 1, T(0, "07:05"));
   reconfirmAll(t4, t4a, t4aa); reconfirmAll(t4, t4b, t4ba, 1);
