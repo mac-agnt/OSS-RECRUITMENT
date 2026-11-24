@@ -22,7 +22,7 @@ export default function DemoClock() {
     <>
       <Popover width={340} button={(open, toggle) => (
         <button className="btn quiet" onClick={toggle} aria-expanded={open} title="Demo time and controls">
-          <Icon d={I.time} /><span className="num">{fmtDay(day).replace(/^\w+ /, "")}, {fmtTime(s.clock)}</span><span className="tag sim hide-sm">Demo</span>
+          <Icon d={I.time} /><span className="num"><span className="hide-sm">{fmtDay(day).replace(/^\w+ /, "")}, </span>{fmtTime(s.clock)}</span><span className="tag sim hide-sm">Demo</span>
         </button>
       )}>
         {(close) => (
