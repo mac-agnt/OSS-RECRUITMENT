@@ -7,7 +7,7 @@ import type {
 } from "./model";
 import { CODE_LABEL, DOC_LABEL, needsRtw } from "./model";
 import {
-  addDays, addMin, dayKey, daysBetween, fmtDay, fmtHM, fmtTime, isoWeekday, localMin, minutesBetween, ms, weekStartKey, zoned
+  addDays, addMin, dayKey, daysBetween, fmtDay, fmtDayY, fmtHM, fmtTime, isoWeekday, localMin, minutesBetween, ms, weekStartKey, zoned
 } from "./time";
 
 /* ── indexes (cached per array; engine drafts push in place, so length invalidates) ── */
@@ -233,12 +233,12 @@ export function docState(s: OpsState, workerId: string, type: DocType, at: strin
   if (verified && (!verified.expires || verified.expires >= day)) {
     const daysLeft = verified.expires ? daysBetween(dayKey(s.clock), verified.expires) : undefined;
     const expiring = daysLeft !== undefined && daysLeft <= s.rules.expiryWarnDays;
-    return { state: expiring ? "expiring" : "valid", doc: verified, daysLeft, label: expiring ? "Expires " + fmtDay(verified.expires!) : "Valid" + (verified.expires ? " to " + fmtDay(verified.expires) : "") };
+    return { state: expiring ? "expiring" : "valid", doc: verified, daysLeft, label: expiring ? "Expires " + fmtDayY(verified.expires!, dayKey(s.clock)) : "Valid" + (verified.expires ? " to " + fmtDayY(verified.expires, dayKey(s.clock)) : "") };
   }
   if (pending) return { state: "pending", doc: pending, label: "Uploaded, awaiting verification" };
   if (verified) {
     const before = verified.expires! >= dayKey(s.clock);
-    return { state: "expired", doc: verified, daysLeft: daysBetween(dayKey(s.clock), verified.expires!), label: before ? "Expires " + fmtDay(verified.expires!) + ", before this shift" : "Expired " + fmtDay(verified.expires!) };
+    return { state: "expired", doc: verified, daysLeft: daysBetween(dayKey(s.clock), verified.expires!), label: before ? "Expires " + fmtDayY(verified.expires!, dayKey(s.clock)) + ", before this shift" : "Expired " + fmtDayY(verified.expires!, dayKey(s.clock)) };
   }
   const rej = docs.find((d) => d.status === "rejected");
   if (rej) return { state: "rejected", doc: rej, label: "Rejected" + (rej.note ? ": " + rej.note : "") };
@@ -322,13 +322,13 @@ function docReason(s: OpsState, w: Worker, t: DocType, at: string, prefix: strin
   const v = docState(s, w.id, t, at);
   const name = DOC_LABEL[t];
   if (v.state === "valid" || v.state === "not_required") return { code: "doc", label: prefix + name + " valid", level: "ok" };
-  if (v.state === "expiring") return { code: "doc", label: name + " expires " + fmtDay(v.doc!.expires!), level: "warn" };
+  if (v.state === "expiring") return { code: "doc", label: name + " expires " + fmtDayY(v.doc!.expires!, dayKey(s.clock)), level: "warn" };
   const validNow = v.state === "expired" && v.doc!.expires! >= dayKey(s.clock);
   // A document that is valid today but runs out before a shift far ahead is a renewal warning, not a block (yet).
   if (validNow && ms(at) - ms(s.clock) > s.rules.expiryWarnDays * 864e5)
-    return { code: "doc", label: name + " expires " + fmtDay(v.doc!.expires!) + ", before this shift: renewal needed", level: "warn" };
+    return { code: "doc", label: name + " expires " + fmtDayY(v.doc!.expires!, dayKey(s.clock)) + ", before this shift: renewal needed", level: "warn" };
   const what = v.state === "pending" ? "awaiting verification" : v.state === "missing" ? "not on file" : v.state === "rejected" ? "rejected" :
-    validNow ? "expires before this shift" : "expired " + fmtDay(v.doc!.expires!);
+    validNow ? "expires before this shift" : "expired " + fmtDayY(v.doc!.expires!, dayKey(s.clock));
   return { code: "doc:" + t, label: prefix + name + " " + what, level: "hard" };
 }
 export function eligibility(s: OpsState, workerId: string, shiftId: string, role: string): Elig {
@@ -399,14 +399,21 @@ export const eligibleAvailable = (s: OpsState, shiftId: string, role: string) =>
   candidates(s, shiftId, role).filter((c) => (c.e.status === "eligible" || c.e.status === "warning") && c.e.avail === "available" && !c.offered);
 
 /** Best replacement for an assignment: willing standby first, then the best eligible available worker. */
-export function replacementFor(s: OpsState, asgId: string): { workerId: string; from: "standby" | "eligible"; standbyId?: string } | null {
+export function replacementFor(s: OpsState, asgId: string, exclude?: Set<string>): { workerId: string; from: "standby" | "eligible"; standbyId?: string } | null {
   const a = asg(s, asgId);
-  for (const b of standbyOf(s, a.shiftId).filter((x) => x.role === a.role)) {
+  for (const b of standbyOf(s, a.shiftId).filter((x) => x.role === a.role && !exclude?.has(x.workerId))) {
     const e = eligibility(s, b.workerId, a.shiftId, a.role);
     if (e.status === "eligible" || e.status === "warning") return { workerId: b.workerId, from: "standby", standbyId: b.id };
   }
-  const c = eligibleAvailable(s, a.shiftId, a.role)[0];
+  const c = eligibleAvailable(s, a.shiftId, a.role).find((x) => !exclude?.has(x.w.id));
   return c ? { workerId: c.w.id, from: "eligible" } : null;
+}
+/** Distinct replacement suggestions for several assignments on the same shift. */
+export function replacementsFor(s: OpsState, asgIds: string[]) {
+  const used = new Set<string>();
+  const out = new Map<string, ReturnType<typeof replacementFor>>();
+  for (const id of asgIds) { const r = replacementFor(s, id, used); if (r) used.add(r.workerId); out.set(id, r); }
+  return out;
 }
 
 /* ── timesheets ─────────────────────────────────────────────────────────── */

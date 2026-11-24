@@ -181,7 +181,7 @@ export default function Workspace({ id }: { id: string }) {
         <span><Icon d={I.client} size={14} />{Q.client(s, ev.clientId).name}</span>
         <span><Icon d={I.pin} size={14} />{Q.venue(s, ev.venueId).name}{new Set(shs.map((x) => x.venueId || ev.venueId)).size > 1 ? " and " + (new Set(shs.map((x) => x.venueId || ev.venueId)).size - 1) + " more" : ""}</span>
         <span><Icon d={I.events} size={14} />{fmtDay(dayKey(sp.start))}{dayKey(sp.end) !== dayKey(sp.start) && dayKey(sp.end) !== dayKey(addMinIso(sp.start)) ? " to " + fmtDay(dayKey(sp.end)) : ""}, {shs.length === 1 ? span(sp.start, sp.end) : shs.length + " shifts"}</span>
-        <span><Icon d={I.user} size={14} />{supName(s, shs[0] || ({ eventId: ev.id } as Shift))}</span>
+        <span><Icon d={I.user} size={14} />{Q.user(s, ev.supervisorId)?.name || "No supervisor"}{new Set(shs.map((x) => Q.shiftSupervisor(s, x))).size > 1 ? " and " + (new Set(shs.map((x) => Q.shiftSupervisor(s, x))).size - 1) + " shift supervisors" : ""}</span>
         <span className="num"><Icon d={I.crew} size={14} /><b className="ink">{c.confirmed}</b> of {c.required} confirmed{c.outstanding ? ", " + c.outstanding + " open" : ""}</span>
       </span>}
       actions={<>
@@ -197,7 +197,7 @@ export default function Workspace({ id }: { id: string }) {
       {ev.status === "cancelled" && <div style={{ marginBottom: 12 }}><Notice tone="warn">Cancelled: {ev.cancelReason}</Notice></div>}
       <div style={{ marginBottom: 16 }}>
         <Tabs label="Event workspace" value={tab} onChange={(v) => setQuery({ tab: v, shift: null })} items={[
-          { id: "overview", label: "Overview" }, { id: "roster", label: "Shifts and roster", n: flagged || c.outstanding, tone: flagged ? "bad" : undefined },
+          { id: "overview", label: "Overview" }, { id: "roster", label: "Shifts and roster", n: flagged || (c.outstanding < 100 ? c.outstanding : 0), tone: flagged ? "bad" : undefined },
           { id: "comms", label: "Communications", n: unread, tone: "accent" }, { id: "attendance", label: "Attendance" },
           { id: "timesheets", label: "Timesheets", n: lineCount }, { id: "instructions", label: "Instructions" }]} />
       </div>

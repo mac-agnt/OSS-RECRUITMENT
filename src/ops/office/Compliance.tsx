@@ -9,7 +9,7 @@ import * as E from "../engine";
 import * as Q from "../selectors";
 import { go, setQuery, useRoute } from "../router";
 import { office, useOps } from "../store";
-import { dayKey, fmtDay, relTime } from "../time";
+import { dayKey, fmtDay, fmtDayY, relTime } from "../time";
 import { Btn, Col, downloadCsv, Drawer, I, Icon, KV, Notice, Pager, Panel, Search, Select, Status, Table, Tabs } from "../ui/kit";
 import { Page } from "./common";
 
@@ -53,7 +53,7 @@ export function DocReview({ doc, onClose }: { doc: Doc; onClose: () => void }) {
           </div>
         ) : <Notice tone="warn" icon={I.lock}>Restricted. Only staff with document access (compliance and events coordinators) can open the file. You can still see its status.</Notice>}
         <KV items={[["Worker", <button className="linkbtn" onClick={() => go("/crew/" + w.id)}>{w.name}</button>], ["Work authorisation", w.rtw], ["Document", doc.name], ["Reference", doc.ref],
-          ["Issued", fmtDay(doc.issued)], ["Expires", doc.expires ? fmtDay(doc.expires) : "No expiry"], ["Verification", doc.status === "verified" ? "Verified by " + Q.nameOf(s, doc.verifiedBy || "") + (doc.verifiedAt ? ", " + fmtDay(dayKey(doc.verifiedAt)) : "") : doc.status === "rejected" ? "Rejected: " + (doc.note || "") : "Not verified yet"]]} />
+          ["Issued", fmtDayY(doc.issued, dayKey(s.clock))], ["Expires", doc.expires ? fmtDayY(doc.expires, dayKey(s.clock)) : "No expiry"], ["Verification", doc.status === "verified" ? "Verified by " + Q.nameOf(s, doc.verifiedBy || "") + (doc.verifiedAt ? ", " + fmtDay(dayKey(doc.verifiedAt)) : "") : doc.status === "rejected" ? "Rejected: " + (doc.note || "") : "Not verified yet"]]} />
         {doc.status === "pending" && !canVerify && <Notice tone="info">You can't verify documents. Ask Clodagh or Daniele.</Notice>}
         <span className="tiny dim">Verifying confirms the details match the document. It doesn't check authenticity with the issuing body.</span>
       </div>
@@ -88,8 +88,8 @@ export default function Compliance() {
     { key: "w", label: "Worker", render: (x) => <div className="stack" style={{ gap: 0 }}><button className="linkbtn" onClick={() => go("/crew/" + x.w.id)}>{x.w.name}</button><span className="tiny dim">{x.w.rtw} · {x.w.area}</span></div> },
     { key: "d", label: "Document", render: (x) => <div className="stack" style={{ gap: 0 }}><span className="ink">{DOC_LABEL[x.type]}</span><span className="tiny dim">{x.mandatory ? "Required for all shifts" : "Needed for some roles"}</span></div> },
     { key: "ref", label: "Reference", hide: "md", render: (x) => <span className="num small">{x.v.doc?.ref || "-"}</span> },
-    { key: "iss", label: "Issued", hide: "md", render: (x) => (x.v.doc ? fmtDay(x.v.doc.issued) : "-") },
-    { key: "exp", label: "Expires", render: (x) => (x.v.doc?.expires ? <span className="nowrap">{fmtDay(x.v.doc.expires)}{x.v.daysLeft !== undefined && <div className={"tiny " + (x.v.daysLeft < 0 ? "tone-bad" : x.v.daysLeft <= 30 ? "tone-warn" : "dim")}>{x.v.daysLeft < 0 ? -x.v.daysLeft + " days ago" : "in " + x.v.daysLeft + " days"}</div>}</span> : "-") },
+    { key: "iss", label: "Issued", hide: "md", render: (x) => (x.v.doc ? fmtDayY(x.v.doc.issued, dayKey(s.clock)) : "-") },
+    { key: "exp", label: "Expires", render: (x) => (x.v.doc?.expires ? <span className="nowrap">{fmtDayY(x.v.doc.expires, dayKey(s.clock))}{x.v.daysLeft !== undefined && <div className={"tiny " + (x.v.daysLeft < 0 ? "tone-bad" : x.v.daysLeft <= 30 ? "tone-warn" : "dim")}>{x.v.daysLeft < 0 ? -x.v.daysLeft + " days ago" : "in " + x.v.daysLeft + " days"}</div>}</span> : "-") },
     { key: "st", label: "Status", render: (x) => <div className="stack" style={{ gap: 2, alignItems: "flex-start" }}><Status tone={TONE[x.v.state]}>{LABEL[x.v.state]}</Status>{x.rostered && <span className="tiny tone-bad">Rostered {fmtDay(dayKey(Q.shift(s, x.rostered).start))}</span>}</div> },
     { key: "a", label: "", render: (x) => <div className="row" style={{ justifyContent: "flex-end" }}>
       {x.v.doc && <Btn size="sm" kind="quiet" icon={Q.can(s, s.ui.officeId, "view_docs") ? I.eye : I.lock} onClick={() => setOpen(x.v.doc!)}>{x.v.state === "pending" ? "Review" : "View"}</Btn>}
@@ -114,7 +114,7 @@ export default function Compliance() {
             cols={[
               { key: "w", label: "Worker", render: (d) => <span className="strong">{Q.worker(s, d.workerId).name}</span> },
               { key: "d", label: "Document", render: (d) => DOC_LABEL[d.type] + (Q.worker(s, d.workerId).status === "pending_verification" ? " (new worker)" : "") },
-              { key: "e", label: "Expires", render: (d) => (d.expires ? fmtDay(d.expires) : "-") },
+              { key: "e", label: "Expires", render: (d) => (d.expires ? fmtDayY(d.expires, dayKey(s.clock)) : "-") },
               { key: "u", label: "Uploaded", render: (d) => relTime(d.uploadedAt, s.clock) },
               { key: "a", label: "", render: () => <span className="row" style={{ justifyContent: "flex-end" }}><Btn size="sm" kind="primary">Review</Btn></span> }]} />
         </Panel>

@@ -127,7 +127,7 @@ function Jobs({ wid, go }: { wid: string; go: (t: Tab) => void }) {
       {w.status === "pending_verification" && <Notice tone="warn">We're checking your documents. You'll get job offers once they're verified.</Notice>}
       {comp.level === "action" && w.status === "active" && (
         <div className="m-card attn"><span className="strong tone-bad">Action needed: {comp.summary}</span><span className="small">You can't be booked until this is fixed. Upload the renewed document and the office will verify it.</span>
-          <Btn kind="primary" className="m-big" icon={I.upload} onClick={() => go("profile")}>Upload document</Btn></div>
+          <Btn kind="primary" className="m-big" icon={I.upload} onClick={() => { go("profile"); setTimeout(() => document.getElementById("m-docs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}>Upload document</Btn></div>
       )}
       <div className="m-h">Job offers</div>
       {!offers.length && <div className="m-card"><span className="strong">No offers right now</span><span className="small dim">New jobs appear here and by WhatsApp. Keep your availability up to date so we can offer you more.</span></div>}
@@ -204,37 +204,39 @@ function Clock({ wid }: { wid: string }) {
   const [qr, setQr] = useState<"good" | "old">("good");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const mine = Q.asgsOfWorker(s, wid).filter((a) => a.status === "confirmed");
-  const active = mine.find((a) => Q.asgView(s, a.id).inAt && !Q.asgView(s, a.id).outAt) || mine.find((a) => Q.asgView(s, a.id).pendingSync);
-  const next = mine.filter((a) => ms(Q.shift(s, a.shiftId).end) > now && !Q.asgView(s, a.id).outAt).sort((a, b) => Q.shift(s, a.shiftId).start.localeCompare(Q.shift(s, b.shiftId).start))[0];
-  const a = active || next;
-  if (!a) return <div className="m-card"><span className="strong">No shift to clock in to</span><span className="small dim">Your next accepted shift will show here.</span></div>;
-  const sh = Q.shift(s, a.shiftId), v = Q.asgView(s, a.id), venue = Q.shiftVenue(s, sh);
+  const views = mine.map((a) => Q.asgView(s, a.id));
+  const active = views.find((v) => (v.inAt && !v.outAt) || v.pendingSync);
+  const next = views.filter((v) => !v.inAt && !v.outAt && ms(v.sh.end) > now).sort((x, y) => x.sh.start.localeCompare(y.sh.start))[0];
+  const recent = views.filter((v) => v.outAt && now - ms(v.outAt) < 8 * 3600e3).sort((x, y) => y.outAt!.localeCompare(x.outAt!))[0];
+  const target = active || (next && ms(next.sh.start) - now < 18 * 3600e3 ? next : undefined);
+  const done = recent ? Q.line(s, recent.a.id) : null;
+  const summary = done && recent && (
+    <div className="m-card">
+      <span className="strong tone-ok">Clocked out of {Q.event(s, recent.sh.eventId).name.split(":")[0]} at {fmtTime(recent.outAt!)}</span>
+      <div className="m-meta">
+        <span>Worked {fmtHM(done.workedMin)}{done.breakMin ? " after a " + fmtHM(done.breakMin) + " break" : ""}</span>
+        <span>Paid {fmtHM(done.payableMin)}{done.topupMin ? " (the " + fmtHM(s.rules.minimumMin) + " minimum applies)" : ""}</span>
+        <span>About {fmtMoney(done.pay)} before tax, once approved</span>
+      </div>
+    </div>
+  );
+  if (!target) return <>
+    {msg && <Notice tone={msg.ok ? "ok" : "bad"}>{msg.text}</Notice>}
+    {summary}
+    <div className="m-card"><span className="strong">No shift to clock in to right now</span>
+      <span className="small dim">{next ? "Your next shift: " + Q.event(s, next.sh.eventId).name + ", " + fmtDay(dayKey(next.sh.start)) + " at " + fmtTime(next.sh.start) + ". Clock-in opens " + s.rules.clockOpenMin + " minutes before." : "Accepted shifts show here on the day."}</span></div>
+  </>;
+  const v = target, sh = v.sh, venue = Q.shiftVenue(s, sh);
   const opens = ms(sh.start) - s.rules.clockOpenMin * 60000;
   const dist = where === "here" ? 18 : where === "near" ? 46 : 240;
   const doClock = (kind: "in" | "out") => {
     const fn = kind === "in" ? E.clockIn : E.clockOut;
-    const r = act(wid, fn, a.id, { method, distanceM: dist, offline: where === "offline", token: qr === "good" ? E.qrToken(sh.id, sh.version) : "OSS-" + sh.id + "-v0" });
+    const r = act(wid, fn, v.a.id, { method, distanceM: dist, offline: where === "offline", token: qr === "good" ? E.qrToken(sh.id, sh.version) : "OSS-" + sh.id + "-v0" });
     setMsg({ ok: r.ok, text: r.msg });
   };
-  const sim = (
-    <div className="m-sim" aria-label="Demo controls">
-      <span className="label">Demo: simulated phone</span>
-      <button className={"chip" + (method === "gps" ? " on" : "")} onClick={() => setMethod("gps")}><Icon d={I.gps} size={14} />Location</button>
-      <button className={"chip" + (method === "qr" ? " on" : "")} onClick={() => setMethod("qr")}><Icon d={I.qr} size={14} />QR code</button>
-      {method === "gps" ? <>
-        <button className={"chip" + (where === "here" ? " on" : "")} onClick={() => setWhere("here")}>At the venue</button>
-        <button className={"chip" + (where === "near" ? " on" : "")} onClick={() => setWhere("near")}>46 m away</button>
-        <button className={"chip" + (where === "far" ? " on" : "")} onClick={() => setWhere("far")}>240 m away</button>
-      </> : <>
-        <button className={"chip" + (qr === "good" ? " on" : "")} onClick={() => setQr("good")}>Today's code</button>
-        <button className={"chip" + (qr === "old" ? " on" : "")} onClick={() => setQr("old")}>An old code</button>
-      </>}
-      <button className={"chip" + (where === "offline" ? " on" : "")} onClick={() => setWhere(where === "offline" ? "here" : "offline")}><Icon d={I.wifiOff} size={14} />No signal</button>
-    </div>
-  );
-  const done = v.outAt ? Q.line(s, a.id) : null;
   return (
     <>
+      {summary}
       <div className="m-card">
         <span className="small dim">{fmtDay(dayKey(sh.start))}, {span(sh.start, sh.end)}</span>
         <h2>{Q.event(s, sh.eventId).name}</h2>
@@ -243,7 +245,7 @@ function Clock({ wid }: { wid: string }) {
       {msg && <Notice tone={msg.ok ? "ok" : "bad"}>{msg.text}</Notice>}
       {v.pendingSync && (
         <div className="m-card"><span className="strong">Saved on this phone</span><span className="small">No signal when you clocked. It syncs as soon as you're back online; your original time is kept.</span>
-          <Btn className="m-big" icon={I.refresh} onClick={() => setMsg({ ok: true, text: act(wid, E.syncOffline, a.id).msg })}>I'm back online: sync now</Btn></div>
+          <Btn className="m-big" icon={I.refresh} onClick={() => setMsg({ ok: true, text: act(wid, E.syncOffline, v.a.id).msg })}>I'm back online: sync now</Btn></div>
       )}
       {!v.inAt && !v.pendingSync && (
         <div className="m-card m-clock">
@@ -261,17 +263,20 @@ function Clock({ wid }: { wid: string }) {
           <Btn kind="primary" className="m-huge" block icon={I.check} onClick={() => doClock("out")}>Clock out</Btn>
         </div>
       )}
-      {done && (
-        <div className="m-card">
-          <span className="strong tone-ok">Clocked out at {fmtTime(v.outAt!)}</span>
-          <div className="m-meta">
-            <span>Worked {fmtHM(done.workedMin)}{done.breakMin ? " after a " + fmtHM(done.breakMin) + " break" : ""}</span>
-            <span>Paid {fmtHM(done.payableMin)}{done.topupMin ? " (minimum " + fmtHM(s.rules.minimumMin) + " applies)" : ""}</span>
-            <span>Estimated {fmtMoney(done.pay)} before tax, once approved</span>
-          </div>
-        </div>
-      )}
-      {!v.outAt && sim}
+      {(now >= opens || v.inAt) && <div className="m-sim" aria-label="Demo controls">
+        <span className="label">Demo: simulated phone</span>
+        <button className={"chip" + (method === "gps" ? " on" : "")} onClick={() => setMethod("gps")}><Icon d={I.gps} size={14} />Location</button>
+        <button className={"chip" + (method === "qr" ? " on" : "")} onClick={() => setMethod("qr")}><Icon d={I.qr} size={14} />QR code</button>
+        {method === "gps" ? <>
+          <button className={"chip" + (where === "here" ? " on" : "")} onClick={() => setWhere("here")}>At the venue</button>
+          <button className={"chip" + (where === "near" ? " on" : "")} onClick={() => setWhere("near")}>46 m away</button>
+          <button className={"chip" + (where === "far" ? " on" : "")} onClick={() => setWhere("far")}>240 m away</button>
+        </> : <>
+          <button className={"chip" + (qr === "good" ? " on" : "")} onClick={() => setQr("good")}>Today's code</button>
+          <button className={"chip" + (qr === "old" ? " on" : "")} onClick={() => setQr("old")}>An old code</button>
+        </>}
+        <button className={"chip" + (where === "offline" ? " on" : "")} onClick={() => setWhere(where === "offline" ? "here" : "offline")}><Icon d={I.wifiOff} size={14} />No signal</button>
+      </div>}
     </>
   );
 }
@@ -371,7 +376,7 @@ function Profile({ wid }: { wid: string }) {
         ))}
         <Btn kind="primary" className="m-big" disabled={week === w.week} onClick={() => act(wid, E.setWeek, wid, week)}>Save availability</Btn>
       </div>
-      <div className="m-h">My documents</div>
+      <div className="m-h" id="m-docs">My documents</div>
       <div className="m-list">
         {comp.items.map((it) => (
           <div key={it.type} className="m-item">

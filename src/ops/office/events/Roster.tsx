@@ -135,6 +135,7 @@ function ShiftCard({ s, ev, sh, onFind }: { s: OpsState; ev: Event; sh: Shift; o
   const st = Q.staffStatus(s, ev.id, [sh]);
   const conf = Q.confirmedOf(s, sh.id);
   const flagged = conf.filter((a) => a.flaggedAt);
+  const recs = Q.replacementsFor(s, flagged.filter((a) => !s.offers.some((o) => o.replaces === a.id && Q.isOpenOffer(s, o))).map((a) => a.id));
   const offers = Q.offersOfShift(s, sh.id).filter((o) => Q.isOpenOffer(s, o));
   const standby = Q.standbyOf(s, sh.id);
   const ended = Q.asgsOfShift(s, sh.id).filter((a) => a.status !== "confirmed");
@@ -169,7 +170,7 @@ function ShiftCard({ s, ev, sh, onFind }: { s: OpsState; ev: Event; sh: Shift; o
         })}
       </div>
       {flagged.map((a) => {
-        const rec = Q.replacementFor(s, a.id);
+        const rec = recs.get(a.id);
         const w = Q.worker(s, a.workerId);
         const pending = s.offers.find((o) => o.replaces === a.id && Q.isOpenOffer(s, o));
         return (

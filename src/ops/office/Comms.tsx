@@ -82,11 +82,16 @@ export function Composer({ eventId, workerId, shiftId, onSent, compact }: { even
 function ThreadView({ threadId, workerId, eventId, onBack }: { threadId?: string; workerId?: string; eventId?: string; onBack?: () => void }) {
   const s = useOps();
   const [wa, setWa] = useState(false);
+  const [all, setAll] = useState(false);
   const t = threadId ? Q.threadById(s, threadId) : undefined;
   const wid = workerId || t?.workerId;
   const eid = eventId || t?.eventId;
-  const msgs = useMemo(() => (t ? Q.messagesOf(s, t.id).slice().sort((a, b) => a.at.localeCompare(b.at)) : []), [s, t]);
-  const unread = msgs.filter((m) => m.to.includes("office") && !m.read.office).length;
+  const allMsgs = useMemo(() => (t ? Q.messagesOf(s, t.id).slice().sort((a, b) => a.at.localeCompare(b.at)) : []), [s, t]);
+  // In event threads, routine replies are summarised in the tallies; problems always show.
+  const routine = (m: Message) => t?.kind === "event" && m.kind === "reply" && !!m.code && ["confirmed", "on_way", "arrived", "declined"].includes(m.code);
+  const hidden = allMsgs.filter(routine).length;
+  const msgs = all ? allMsgs : allMsgs.filter((m) => !routine(m));
+  const unread = allMsgs.filter((m) => m.to.includes("office") && !m.read.office).length;
   useEffect(() => { if (t && unread) actQuiet(s.ui.officeId, E.markRead, "office", t.id); }, [t?.id, unread]);
   const title = t?.title || (wid ? Q.worker(s, wid).name : eid ? Q.event(s, eid).name : "");
   return (
@@ -108,7 +113,8 @@ function ThreadView({ threadId, workerId, eventId, onBack }: { threadId?: string
       </div>
       <div className="thread-b" style={wa ? { background: "var(--wa-bg)" } : undefined}>
         {wa && <div className="tiny dim" style={{ alignSelf: "center" }}>Preview of how this thread looks in WhatsApp. Simulated: no WhatsApp account is connected.</div>}
-        {!msgs.length && <div className="empty"><b>No messages yet</b>Write the first one below.</div>}
+        {!allMsgs.length && <div className="empty"><b>No messages yet</b>Write the first one below.</div>}
+        {hidden > 0 && <button className="linkbtn small" style={{ alignSelf: "center" }} onClick={() => setAll((x) => !x)}>{all ? "Hide routine replies" : hidden + " routine replies (confirmed, on my way, arrived) are counted in the tallies. Show them"}</button>}
         {msgs.map((m) => <Bubble key={m.id} s={s} m={m} wa={wa} />)}
       </div>
       <div className="thread-f"><Composer key={(wid || "") + (eid || "")} workerId={wid} eventId={wid ? undefined : eid} compact={!!wid} /></div>
@@ -219,7 +225,7 @@ export default function Comms({ threadId }: { threadId?: string }) {
             <button key={t.id} className={"thread-item" + (openId === t.id ? " on" : "")} onClick={() => go("/comms/" + t.id)}>
               {t.kind === "direct" ? <Avatar name={t.title} /> : <span className="avatar"><Icon d={I.events} size={14} /></span>}
               <span className="stack grow" style={{ gap: 1 }}>
-                <span className="row between"><span className="t ellip">{t.title}</span><span className="tiny dim nowrap">{last ? relTime(last.at, s.clock) : ""}</span></span>
+                <span className="row between"><span className="t ellip">{t.title}{t.kind === "event" && t.eventId && Q.event(s, t.eventId) ? <span className="dim" style={{ fontWeight: 400 }}> · {fmtDay(dayKey(Q.eventSpan(s, t.eventId).start))}</span> : null}</span><span className="tiny dim nowrap">{last ? relTime(last.at, s.clock) : ""}</span></span>
                 <span className="row between"><span className="p">{last ? (last.from.kind === "worker" ? Q.nameOf(s, last.from.id).split(" ")[0] + ": " : "") + (last.code ? CODE_LABEL[last.code] : last.body) : ""}</span>{u > 0 && <span className="count accent">{u}</span>}</span>
               </span>
             </button>

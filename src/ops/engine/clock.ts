@@ -6,7 +6,7 @@
 import type { Code, OpsState, Result, Rules } from "../model";
 import { DOC_LABEL } from "../model";
 import {
-  asgsOfShift, confirmedOf, docState, event, isOpenOffer, okClock, clocksOf, replacementFor, shift, shiftVenue, updatesOf, worker
+  asgsOfShift, confirmedOf, docState, event, isOpenOffer, okClock, clocksOf, replacementFor, replacementsFor, shift, shiftVenue, updatesOf, worker
 } from "../selectors";
 import { roll } from "../rand";
 import { addDays, dayKey, fmtDay, fmtTime, ms, zoned } from "../time";
@@ -72,7 +72,8 @@ function autoNoReply(d: OpsState, shiftId: string) {
       d.exceptions.push({ id: nid(d, "X"), asgId: a.id, type: "no_response", status: "open", at: d.clock, key: "noreply:" + a.id,
         detail: worker(d, a.workerId).name + " hasn't replied " + d.rules.noReplyMin + " min before start; potentially unavailable" });
     }
-    const recs = flagged.map((a) => ({ a, r: replacementFor(d, a.id) }));
+    const sug = replacementsFor(d, flagged.map((a) => a.id));
+    const recs = flagged.map((a) => ({ a, r: sug.get(a.id) }));
     audit(d, "auto.no_reply", flagged.length + " not replying " + d.rules.noReplyMin + " min before " + ev.name + " " + sh.label.toLowerCase() + ": "
       + recs.map((x) => worker(d, x.a.workerId).name + (x.r ? " (suggest " + worker(d, x.r.workerId).name + (x.r.from === "standby" ? ", standby" : "") + ")" : " (no replacement available)")).join("; "),
       { type: "shift", id: sh.id }, true);

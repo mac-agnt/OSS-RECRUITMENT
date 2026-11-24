@@ -78,9 +78,9 @@ function SageDrawer({ onClose }: { onClose: () => void }) {
         <Notice tone="info">This produces a file to import into Sage. It does not connect to Sage or pay anyone.</Notice>
         {!ready.length ? <div className="empty"><b>Nothing approved waiting for export</b>Approve timesheets first.</div> : (
           <div className="panel"><Table label="Export preview" rows={ready.slice(0, 60)} rowKey={(l) => l.id} cols={[
-            { key: "ref", label: "Payroll ref", render: (l) => <span className="num small">{l.w.bullhornId || l.w.id}</span> },
+            { key: "ref", label: "Payroll ref", render: (l) => <span className="num small nowrap">{l.w.bullhornId || l.w.id}</span> },
             { key: "n", label: "Employee", render: (l) => l.w.name },
-            { key: "d", label: "Date", render: (l) => fmtDay(l.day) },
+            { key: "d", label: "Date", render: (l) => <span className="nowrap">{fmtDay(l.day)}</span> },
             { key: "e", label: "Event", hide: "sm", render: (l) => <span className="ellip" style={{ maxWidth: 200, display: "inline-block" }}>{l.ev.name}</span> },
             { key: "h", label: "Payable (h)", cls: "r", render: (l) => <span className="num">{decHours(l.payableMin)}</span> },
             { key: "m", label: "Of which minimum", cls: "r", render: (l) => <span className="num">{l.topupMin ? decHours(l.topupMin) : "-"}</span> },
@@ -163,7 +163,7 @@ export default function Timesheets() {
         <Btn size="sm" icon={I.chevR} iconOnly title="Next" onClick={() => setQuery({ date: addDays(date, view === "day" ? 1 : 7) })} />
         <span className="strong">{view === "day" ? fmtDay(date) : fmtDay(from) + " to " + fmtDay(to)}</span>
       </div>
-      <div className="strip" style={{ gridTemplateColumns: "repeat(6, minmax(0, 1fr))", marginBottom: 14 }}>
+      <div className="strip six" style={{ marginBottom: 14 }}>
         <div><b>{t.count}</b><span>Lines</span></div>
         <div><b>{fmtHM(t.sched)}</b><span>Scheduled</span></div>
         <div><b>{fmtHM(t.worked)}</b><span>Worked (after breaks)</span></div>

@@ -181,7 +181,7 @@ export function Table<R>({ cols, rows, rowKey, onRow, empty, selected, onSelect,
               <tr key={k} className={(onRow ? "click " : "") + (selected?.has(k) ? "sel" : "")} onClick={onRow ? () => onRow(r) : undefined}
                 tabIndex={onRow ? 0 : undefined} onKeyDown={onRow ? (e) => { if (e.key === "Enter") onRow(r); } : undefined}>
                 {onSelect && <td className="check" onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label="Select row" checked={!!selected?.has(k)} onChange={(e) => onSelect(k, e.target.checked)} /></td>}
-                {cols.map((c) => <td key={c.key} className={hideCls(c)}>{c.render(r)}</td>)}
+                {cols.map((c) => <td key={c.key} className={hideCls(c)} data-label={typeof c.label === "string" && c.label ? c.label : undefined}>{c.render(r)}</td>)}
               </tr>];
           })}
         </tbody>

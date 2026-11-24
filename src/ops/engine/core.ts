@@ -45,12 +45,14 @@ export function directThread(d: OpsState, workerId: string) {
   if (!t) { t = { id, kind: "direct", workerId, title: nameOf(d, workerId) }; d.threads.push(t); }
   return t;
 }
+/** Replies that only confirm the plan don't need the office to read them; problems do. */
+const ROUTINE = new Set(["confirmed", "on_way", "arrived", "declined"]);
 export function post(d: OpsState, m: Omit<Message, "id" | "at" | "read" | "from" | "channels"> & { from?: Message["from"]; channels?: Message["channels"] }): Message {
   const id = actorId(d);
   const from: Message["from"] = m.from || (id === "system" ? { kind: "system", id: "system" }
     : isWorker(id) ? { kind: "worker", id } : { kind: user(d, id)?.kind === "supervisor" ? "supervisor" : "office", id });
   const msg: Message = { id: nid(d, "M"), at: d.clock, read: {}, channels: m.channels || ["app", "whatsapp"], ...m, from };
-  if (from.kind === "office" || from.kind === "system") msg.read.office = d.clock;
+  if (from.kind === "office" || from.kind === "system" || (m.kind === "reply" && m.code && ROUTINE.has(m.code))) msg.read.office = d.clock;
   d.messages.push(msg);
   return msg;
 }

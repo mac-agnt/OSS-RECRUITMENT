@@ -37,6 +37,9 @@ export function localMin(iso: string): number {
 /** "Tue 24 Nov" for a date key. */
 export const fmtDay = (day: string) => fmtDate(zoned(day, "12:00"));
 
+/** "Sat 20 Nov 2027": adds the year when it differs from the reference day's year. */
+export const fmtDayY = (day: string, ref?: string) => fmtDay(day) + (!ref || day.slice(0, 4) !== ref.slice(0, 4) ? " " + day.slice(0, 4) : "");
+
 /** Euro with cents, for pay. */
 export const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);

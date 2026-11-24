@@ -8,7 +8,7 @@ import * as E from "../../engine";
 import * as Q from "../../selectors";
 import { go, setQuery, useRoute } from "../../router";
 import { act, office, useOps } from "../../store";
-import { dayKey, fmtDay, fmtHM, fmtMoney, ms, span } from "../../time";
+import { dayKey, fmtDay, fmtDayY, fmtHM, fmtMoney, ms, span } from "../../time";
 import { Avatar, Btn, Drawer, Field, I, KV, Notice, Panel, Seg, Select, Status, Table, Tabs, Tag } from "../../ui/kit";
 import { Page } from "../common";
 import { DirectMessages } from "../Comms";
@@ -196,8 +196,8 @@ export default function CrewProfile({ id }: { id: string }) {
             <Table label="Documents" rows={docs} rowKey={(d) => d.id} empty={<div className="empty"><b>No documents</b>Upload one below or ask the worker to use the app.</div>} cols={[
               { key: "t", label: "Document", render: (d) => <div className="stack" style={{ gap: 0 }}><span className="ink">{DOC_LABEL[d.type]}</span><span className="tiny dim">{d.name}</span></div> },
               { key: "r", label: "Reference", hide: "sm", render: (d) => <span className="num small">{d.ref}</span> },
-              { key: "i", label: "Issued", hide: "md", render: (d) => fmtDay(d.issued) },
-              { key: "e", label: "Expires", render: (d) => (d.expires ? fmtDay(d.expires) : "-") },
+              { key: "i", label: "Issued", hide: "md", render: (d) => fmtDayY(d.issued, dayKey(s.clock)) },
+              { key: "e", label: "Expires", render: (d) => (d.expires ? fmtDayY(d.expires, dayKey(s.clock)) : "-") },
               { key: "s", label: "Status", render: (d) => { const v = Q.docState(s, w.id, d.type); const current = v.doc?.id === d.id;
                 return d.status === "pending" ? <Status tone="info">Awaiting verification</Status> : d.status === "rejected" ? <Status tone="bad">Rejected</Status>
                   : current ? <Status tone={v.state === "valid" ? "ok" : v.state === "expiring" ? "warn" : "bad"}>{v.state === "valid" ? "Valid" : v.state === "expiring" ? "Expiring" : "Expired"}</Status> : <Status tone="grey">Replaced</Status>; } },
