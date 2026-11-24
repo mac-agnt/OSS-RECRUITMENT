@@ -23,6 +23,7 @@ function PersonaPicker({ app }: { app: "crew" | "supervisor" }) {
   const cur = Q.worker(s, s.ui.crewId);
   const opts = personas.map((w) => ({ value: w.id, label: w.name }));
   if (cur && !cur.persona) opts.push({ value: cur.id, label: cur.name });
+  opts.push({ value: "new", label: "New sign-up" });
   return (
     <div className="row" style={{ position: "relative" }}>
       <div style={{ width: 160 }}><Select sm label="Worker" value={s.ui.crewId} onChange={(v) => setUi({ crewId: v })} options={opts} /></div>

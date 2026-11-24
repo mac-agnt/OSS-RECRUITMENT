@@ -74,6 +74,20 @@ function VenueRadius() {
     </div>))}</div>;
 }
 
+function ReminderDays() {
+  const s = useOps();
+  const [v, setV] = useState(s.rules.expiryReminders.join(", "));
+  const parsed = v.split(/[,\s]+/).filter(Boolean).map(Number);
+  const changed = parsed.join(",") !== s.rules.expiryReminders.join(",");
+  return (
+    <div className="row wrap" style={{ justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+      <div className="stack" style={{ gap: 1, flex: "1 1 260px" }}><span className="strong">Reminder schedule</span><span className="small dim">Days before expiry that workers get a reminder, separated by commas.</span></div>
+      <div className="row"><input className="input sm" style={{ width: 140 }} value={v} onChange={(e) => setV(e.target.value)} aria-label="Reminder days" />
+        <Btn size="sm" kind={changed ? "primary" : "secondary"} disabled={!changed || parsed.some((n) => !Number.isFinite(n))} onClick={() => office(E.setRule, "expiryReminders", [...new Set(parsed)].sort((a, b) => b - a))}>Save</Btn></div>
+    </div>
+  );
+}
+
 const PERMS: [Perm, string][] = [["allocate", "Events and offers"], ["message", "Messages"], ["approve_hours", "Approve hours"], ["payroll", "Payroll export"], ["view_docs", "Open documents"], ["verify_docs", "Verify documents"], ["supervise", "Supervise"], ["manage", "Admin"]];
 
 function Audit() {
@@ -137,7 +151,7 @@ export default function Settings({ tab: t }: { tab?: string }) {
           </Panel>
           <Panel title="Documents" id="documents">
             <RuleNum k="expiryWarnDays" label="Treat documents as expiring" help="Days before the expiry date." unit="days" />
-            <div className="small dim" style={{ padding: "10px 0" }}>Workers get reminders {s.rules.expiryReminders.join(", ")} days before a document expires.</div>
+            <ReminderDays />
             <h3 style={{ margin: "8px 0" }}>Qualifications needed for every shift in a role</h3>
             <RoleQuals />
           </Panel>

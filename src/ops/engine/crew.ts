@@ -43,6 +43,22 @@ export function registerWorker(d: OpsState, f: WorkerForm, confirmNew = false): 
   audit(d, "worker.registered", actorName(d) + " registered " + w.name + " (" + id + "); pending document verification", { type: "worker", id });
   return ok(w.name + " registered. They can't be booked until their documents are verified.", { id });
 }
+/** A new worker signs up in the crew app. They can't be booked until the office verifies their documents. */
+export function selfRegister(d: OpsState, f: WorkerForm): Result {
+  if (!f.name.trim()) return no("Enter your full name.");
+  if (!f.mobile.trim()) return no("Enter your mobile number. We use it for shift messages.");
+  if (f.email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email.trim())) return no("That email address doesn't look right.");
+  if (!f.roles.length) return no("Choose at least one type of work.");
+  const { exact } = findDuplicates(d, f);
+  if (exact) return no("You're already registered with this " + (normEmail(exact.email) === normEmail(f.email) ? "email" : "mobile") + ". Contact the OSS office.", { existing: exact.id });
+  const id = nextWorkerId(d);
+  d.workers.push({ id, name: f.name.trim(), email: normEmail(f.email), mobile: f.mobile.trim(), area: f.area.trim() || "Not given", county: f.county || "Dublin",
+    region: "Dublin", roles: f.roles, rtw: f.rtw, status: "pending_verification", joined: dayKey(d.clock), bullhornId: null, bullhornState: "not_linked", week: "???????", off: [] });
+  post(d, { threadId: directThread(d, id).id, kind: "reply", to: ["office"], from: { kind: "worker", id }, body: "New sign-up from the crew app: " + f.name.trim() + " (" + f.roles.join(", ") + "). Documents to follow." });
+  audit(d, "worker.self_registered", f.name.trim() + " signed up in the crew app (" + id + "); pending document verification", { type: "worker", id });
+  return ok("Welcome to OSS. Next, add your availability and upload your documents.", { id });
+}
+
 export function updateWorker(d: OpsState, id: string, patch: Partial<Pick<Worker, "name" | "email" | "mobile" | "area" | "county" | "roles" | "rtw" | "note">>): Result {
   const self = actorId(d) === id;
   if (!self) { const x = denied(d, "message", "edit worker details"); if (x) return x; }

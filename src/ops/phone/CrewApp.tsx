@@ -2,8 +2,8 @@
    Jobs, My shifts, Clock in/out, Messages, Profile. */
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { Assignment, Code, DocType, Message } from "../model";
-import { CODE_LABEL, DOC_LABEL } from "../model";
+import type { Assignment, Code, DocType, Message, Rtw } from "../model";
+import { CODE_LABEL, DOC_LABEL, ROLES, needsRtw } from "../model";
 import * as E from "../engine";
 import * as Q from "../selectors";
 import { act, actQuiet, setUi, useOps } from "../store";
@@ -124,7 +124,11 @@ function Jobs({ wid, go }: { wid: string; go: (t: Tab) => void }) {
   const [declining, setDeclining] = useState<string | null>(null);
   return (
     <>
-      {w.status === "pending_verification" && <Notice tone="warn">We're checking your documents. You'll get job offers once they're verified.</Notice>}
+      {w.status === "pending_verification" && (
+        <div className="m-card attn"><span className="strong">We need to check your documents</span>
+          <span className="small">Upload your photo ID{w.rtw.startsWith("Stamp") ? " and IRP card" : ""}. You'll get job offers once the office has verified them.</span>
+          <Btn kind="primary" className="m-big" icon={I.upload} onClick={() => { go("profile"); setTimeout(() => document.getElementById("m-docs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}>Upload documents</Btn></div>
+      )}
       {comp.level === "action" && w.status === "active" && (
         <div className="m-card attn"><span className="strong tone-bad">Action needed: {comp.summary}</span><span className="small">You can't be booked until this is fixed. Upload the renewed document and the office will verify it.</span>
           <Btn kind="primary" className="m-big" icon={I.upload} onClick={() => { go("profile"); setTimeout(() => document.getElementById("m-docs")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); }}>Upload document</Btn></div>
@@ -407,7 +411,38 @@ function Profile({ wid }: { wid: string }) {
   );
 }
 
+const RTWS: Rtw[] = ["Irish citizen", "EU/EEA citizen", "UK citizen", "Stamp 2", "Stamp 4", "Stamp 1G"];
+function SignUp() {
+  const [f, setF] = useState({ name: "", email: "", mobile: "", area: "", county: "Dublin", roles: [] as string[], rtw: "Irish citizen" as Rtw });
+  const [agree, setAgree] = useState(false);
+  return (
+    <div className="m-app">
+      <div className="m-top"><img src="/brand/oss-logo.png" alt="" width={30} height={30} style={{ borderRadius: 7 }} /><div className="stack" style={{ gap: 0 }}><h1>Join OSS</h1><span className="sub">OSS Crew</span></div></div>
+      <div className="m-body">
+        <div className="m-card"><span className="small">Sign up for event work: concerts, sport, festivals and corporate events. Once your ID{needsRtw(f.rtw) ? " and work authorisation are" : " is"} checked you'll get job offers here and on WhatsApp.</span></div>
+        <div className="m-card">
+          <Field label="Full name"><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+          <Field label="Mobile"><input className="input" inputMode="tel" value={f.mobile} onChange={(e) => setF({ ...f, mobile: e.target.value })} placeholder="08x xxx xxxx" /></Field>
+          <Field label="Email"><input className="input" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+          <Field label="Where do you live?"><input className="input" value={f.area} onChange={(e) => setF({ ...f, area: e.target.value })} placeholder="For example: Tallaght" /></Field>
+          <Field label="Work authorisation"><Select value={f.rtw} onChange={(v) => setF({ ...f, rtw: v as Rtw })} options={RTWS.map((r) => ({ value: r, label: r }))} /></Field>
+          <span className="small strong">Work you can do</span>
+          <div className="row wrap">{ROLES.map((r) => <button key={r} className={"chip" + (f.roles.includes(r) ? " on" : "")} aria-pressed={f.roles.includes(r)} onClick={() => setF({ ...f, roles: f.roles.includes(r) ? f.roles.filter((x) => x !== r) : [...f.roles, r] })}>{r}</button>)}</div>
+          <label className="check"><input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /><span className="small">OSS can store these details to offer me work (demo)</span></label>
+          <Btn kind="primary" className="m-big" disabled={!agree} onClick={() => { const r = act("system", E.selfRegister, f); if (r.ok) setUi({ crewId: r.data.id }); }}>Sign up</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The crew app as the chosen worker, or the sign-up screen for a new applicant. */
 export default function CrewApp() {
+  const s = useOps();
+  return s.ui.crewId === "new" ? <SignUp /> : <CrewHome key={s.ui.crewId} />;
+}
+
+function CrewHome() {
   const s = useOps();
   const wid = s.ui.crewId;
   const w = Q.worker(s, wid);
