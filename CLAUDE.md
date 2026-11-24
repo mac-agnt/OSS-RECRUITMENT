@@ -1,3 +1,17 @@
+# OSS copy: which rules apply where
+
+This copy has two experiences. The client brief (Nov 2026) asked for a simpler product, and the owner chose
+to let the brief win for the default app while keeping the Pulse template intact as the advanced experience.
+
+- **Default app (`src/ops/`, routes `/today`, `/events`, ...)**: the simplified OSS events system. Six areas
+  (Today, Events, Crew, Communications, Timesheets, Compliance) plus Settings. No agents UI. The template rules
+  below do NOT apply here. Its own rules: see `docs/superpowers/specs/2026-11-24-oss-simplified-demo-design.md`.
+  Before saying done: `npm run typecheck`, `npm run verify:ops`, and check Today, an event workspace and both
+  phone apps in the browser.
+- **Advanced experience (`/advanced`; `src/views/`, `src/logic/`, `src/oss/`, `src/components/`, `src/runtime/`)**:
+  the previous Pulse demo, frozen. The template rules below still apply to it. Don't edit it for the simplified app.
+  It is also preserved on the `advanced-platform` branch.
+
 # Pulse template: rules for customising
 
 This repo is a template. It gets copied and re-skinned for each client (new name, data, labels, colours).

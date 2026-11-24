@@ -1,83 +1,99 @@
-# OSS Pulse
+# OSS Recruitment: event staffing demo
 
-Event staffing platform demo for OSS Recruitment, built on the Pulse Harbour template. It covers OSS's requirements sheet and developer brief: bookings and staffing gaps, availability, individual shift offers, replacements, crew messaging, live attendance with venue check-in, timesheets with the five-hour minimum and overtime, and the handover of approved hours to Bullhorn. The OSS Crew employee app and a site supervisor app run in a phone frame beside the office view, on the same records.
+A simple, working event staffing system for OSS Recruitment's events division, built after three discovery calls
+with Shane and Daniele. One shared dataset drives three experiences: the office platform, the supervisor app and the
+crew app.
 
-Frontend only, with sample data. Nothing is sent to anyone. Messages, GPS and QR check-in, and Bullhorn are simulated.
-
-## Company scale
-
-The 3Arena story runs on the Dublin events desk. Around it the demo carries the rest of OSS, all synthetic and deterministic (`src/oss/network.ts`):
-
-- Six desks: Dublin events, Stadia and sport, Live music and theatre, Corporate and hospitality, Cork and Munster, West and North. 18 office users.
-- 856 crew across five regions, 19 clients, 26 venues nationwide with map coordinates.
-- About 1,390 positions in the opening week across 27 events, plus bookings to the end of December.
-- Clock-ins, desk approvals and Bullhorn sends for the other desks play forward with the story clock, so Event day shows 10 live events on Saturday afternoon.
-- The story's own numbers are unchanged: `Q.windowTotals(s, { desk: "Dublin events desk" })` still reads 106 / 95 / 89.6%.
-
-Colour has one meaning per hue: kind of work, desk and region use the category palette (`--k-1` to `--k-6`, `kindVar`, `deskVar`, `regionVar`); status keeps green, amber and red; orange is urgent only.
+Frontend only, with fictional sample data. WhatsApp, Bullhorn, Sage, location checks and QR codes are simulated and
+labelled as such wherever they appear. Nothing is sent to anyone.
 
 ## Run it
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run verify     # 48 scenario checks
+npm run dev          # http://localhost:5173/today
+npm run verify:ops   # 27 scenario checks for the events engine
 npm run typecheck
 npm run build
 ```
 
-On a real phone, open `/#crew` or `/#supervisor` to go straight into the apps.
+- **Office**: `/today`. Switch **Office | Supervisor | Crew** in the top bar to open a phone beside the office view.
+- **Phones**: `/m/crew` and `/m/supervisor` open the apps full screen (use these on a real phone).
+- **Previous full platform**: `/advanced` (also kept on the `advanced-platform` branch).
 
-## Sidebar
+Changes are saved in this browser and survive refreshes; other tabs on the same computer stay in sync.
+**Reset demo data** in the demo clock menu (top bar) starts again from this morning.
 
-| Group | Module | What it covers |
-| --- | --- | --- |
-| | Home | AI chat with suggested questions; rail with top-priority items, next events, replies waiting, compliance, briefing |
-| | Agents | Operations room: each agent's work log with inline decisions, what it watches, can and never does, who signs off; the team on a 36-hour timeline and how work moves between them; an approval inbox showing exactly who or what each proposal affects |
-| | Calendar | Month (events, inductions, payroll cut-off), week (crew needed vs free), season |
-| | Clients | Accounts with fill rate, hours, preferred crew, do-not-rebook list, standards; sign-off; venues |
-| | Dashboard | Control panel ("N things to do, M urgent") with one-click actions; executive metrics; year ahead |
-| Run events | Events | Bookings, every event with staffing, call sheet, roles and team leaders, kit and welfare, hours and client sign-off |
-| | Staffing | Allocate with Stamp 2 hours, 11-hour rest, reliability and client preferences on every candidate; responses; replacements |
-| | Event day | Command centre for all of Ireland: live figures, crew-on-site curve, map of every event, needs-attention list, event cards, one event's crew in lanes; venue check-in; exceptions |
-| | Timesheets | Rostered vs actual, 5-hour minimum, overtime, corrections, Bullhorn |
-| Crew | Crew | Register, availability, documents, on-site registration |
-| | Recruitment | Pipeline from application to active crew, group inductions, Ryder Cup 2027 plan |
-| | Compliance | Right to work and the Stamp 2 20-hour cap, Working Time Act rest and breaks, licences and vetting per event |
-| | Messages | Inbox, event and bulk messages, reminders |
-| Portals | Portals | Client portal (live staffing, hours sign-off), OSS Crew app, supervisor app |
-| Run the business | Reports, Records, Activity | Client and payroll exports, qualifications; Ontology; audit trail |
+## What's in it
 
-The bottom bar carries the story clock and opens the crew app, supervisor app and client portal.
+| Area | What it does |
+| --- | --- |
+| Today | What needs attention this morning, the day's counts and every shift with staffing (green, amber, red, grey) and attendance. |
+| Events | Calendar (Day by default, Week, Month) with filters; New event; the event workspace (overview, shifts and roster, messages, attendance, timesheets, instructions); Clients. |
+| Crew | Searchable list of about 1,040 workers with availability, skills, area, bookings, weekly hours, compliance and contact; profiles; register a worker; assign to an event. |
+| Communications | Event and direct threads, messages to one worker, an event crew, selected or unconfirmed workers, structured replies with tallies, WhatsApp preview. |
+| Timesheets | Built from clock-in and clock-out; supervisor then office approval; five-hour minimum shown separately; Sage CSV export; Bullhorn sync preview. |
+| Compliance | Valid, expiring, expired and missing documents; verification queue; renewal requests; filtered CSV report; restricted document view. |
+| Settings | Rules, integrations, team and access, audit log. |
 
-## Walking the 3Arena story
+## Demo data
 
-The story clock in the bottom bar (dots + time) moves through the 3Arena story. It moves the scenario between five moments; everything else is clicked live.
+Generated from the day you open it, so Today is always today. The demo clock starts at 07:45.
 
-1. **The booking call** (Thu 16:00). Dashboard shows 3Arena at 25/30. Events, open 3Arena: two shifts, who accepted, who hasn't answered, PPE.
-2. **Phone, as Aidan Murphy.** Calendar: set Saturday free 07:00 to 14:00, not free after. Home: accept set-up crew, decline event crew. The office counts change straight away.
-3. **Staffing, Allocate.** Pick the gap, tick Leah, Adam and Sofia (or approve the Staffing Assistant's proposal in Agents), send. Accept on their phones: 30/30.
-4. **Event day** (story clock, step 3). Phone as Chloé Ryan: open the shift, "Can't make it". Staffing, Replacements shows the gap with the standby list; send Orla the offer, accept on Orla's phone.
-5. **Owen running late.** Phone as Owen Clarke: open the shift, Running late, ETA 17:20. Story clock: Sat 16:50, then "Crew checks in", then Sat 17:12 (missed clock-in alert). Attendance shows him late. At Sat 17:20, Clock in at 240 m (rejected), then 42 m (accepted). Venue check-in shows every reading.
-6. **Morning after** (step 4). Phone, Supervisor: Issues, fix Niamh's clock-out to 23:30. Timesheets, Corrections: approve it. Review: approve all 30 lines (170h rostered, 170h10m worked, +1h minimum, 171h10m payable, 1h30m overtime).
-7. **Bullhorn.** Timesheets, Bullhorn: send the 3Arena hours (30 rows, 10,270 minutes). Jamie Allen's row from Wednesday is blocked: Match and retry. Reports, Client report: export the week to Excel.
+- **Today**: RDS build (finished), National Aquatic Centre gala (three crew not replying, flagged at 45 minutes),
+  Guinness Storehouse lunch, 3Arena load-in and show (one place open, four on standby), Aviva Stadium match day
+  ("requires five additional workers, eight eligible available"), Convention Centre Dublin dinner (2 of 12).
+- **Yesterday**: timesheets waiting for the office, including a three-hour shift paid at five hours and a missing clock-out.
+- **Ahead**: two weeks of bookings, Electric Picnic 2027 and the Ryder Cup 2027 (seven days, four locations, eight
+  supervisors, about 860 positions on peak days).
+- **Phone personas**: Ciarán (3Arena load-in today), Maria (Stamp 2, close to 20 hours), Priya (Stamp 2 permission
+  expired), Tomasz (3Arena show tonight), Aoife (offer for tonight's dinner). Supervisors: Bianca and colleagues.
+  Real OSS people appear by first name only; every worker is fictional.
 
-"Start over" in the story clock resets everything.
+## Demo clock
+
+The clock pill in the top bar moves demo time forward (+15 min, +1 hour, +3 hours, next morning, or jump to the next
+reminder or shift milestone). As time moves:
+
+- 24 hours before a shift, confirmed crew are asked to reconfirm.
+- 2 hours before, they're asked for their travelling status.
+- 45 minutes before, anyone who hasn't replied is flagged and a replacement is recommended (standby first).
+- Simulated crew (everyone except the phone personas) reply, clock in and clock out. Turn this off in the same menu.
+
+## Five scenarios to walk through
+
+1. **Last-minute request**: New event, add a 10-person set-up shift and a 20-person event shift, save, then
+   Find crew, Select best, Send offers. Simulate replies (or accept on a crew phone). The first acceptances fill the
+   roster; later ones join standby.
+2. **Dropouts**: demo clock, "Three crew cancel tonight's 3Arena show". Today shows the shortfall; open 3Arena,
+   confirm standby workers or send replacement offers.
+3. **Ryder Cup**: Events, Ryder Cup 2027, Shifts and roster. Staffing by day, filter by location or supervisor,
+   find crew for one location and day.
+4. **Attendance and payroll**: jump to 12:00, crew phone as Ciarán, Clock in (try "240 m away" first), +3 hours,
+   Clock out: 3 hours worked, 5 paid. Supervisor phone as Marek, Approvals. Timesheets, approve, Sage export.
+5. **Expired documentation**: crew phone as Priya (blocked), upload the renewed work authorisation. Compliance,
+   Awaiting verification, Verify. Offer her tonight's dinner shift and accept on her phone.
+
+## Rules (all in Settings)
+
+Clock-in radius (50 m, per location too), clock-in window, missing clock-out alert, minimum paid hours (5), unpaid
+break, overtime flags (flag only, to validate with OSS), sample pay rates, reminder timings (24 h, 2 h, 45 min),
+automatic reassignment (off), offer expiry, Stamp 2 limits (20 h term, 40 h holidays; no limit for others, warning
+over 48 h), document expiry warnings and reminders, qualifications per role.
+
+Compliance blocks (photo ID, work authorisation, required qualifications, unverified documents) and double bookings
+can never be overridden. Availability, travel time between venues and Stamp 2 hours can be, with a recorded reason.
 
 ## Where things are
 
-| Area | Where |
+| | |
 | --- | --- |
-| Records, seed (Thu 12 Nov 2026 16:00), story stages | `src/oss/model.ts`, `src/oss/seed.ts`, `src/oss/stages.ts` |
-| Industry layer (right to work, rest, call sheets, clients, recruitment) and to-do engine | `src/oss/industry.ts`, `src/oss/extSeed.ts`, `src/oss/todo.ts` |
-| Actions (all audited), selectors (every total) | `src/oss/engine.ts`, `src/oss/selectors.ts` |
-| Shared store | `src/oss/store.ts` |
-| Office pages | `src/oss/pages/` |
-| OSS Crew and supervisor apps, check-in | `src/oss/phone/` |
-| UI kit, drawers, shell pieces | `src/oss/ui/`, `src/styles/oss.css` |
-| Pulse shell, Home, Records and Ontology (template) | `src/views/`, `src/logic/PulseLogic.js` (`ossOverrides`) |
-| Scenario checks | `tests/scenario.ts` |
-
-## Template rules kept
-
-See `CLAUDE.md`. Agents sits directly under Home, Records opens on Ontology, and the Home centre holds only the pill, greeting, subline, ask box and thread. Do not run `npm run import-design` on this copy.
+| Design and plan | `docs/superpowers/specs/2026-11-24-oss-simplified-demo-design.md`, `docs/superpowers/plans/2026-11-24-oss-simplified-demo.md` |
+| Model, selectors, engine | `src/ops/model.ts`, `src/ops/selectors.ts`, `src/ops/engine/` |
+| Seed (date-relative) | `src/ops/seed/` |
+| Store and router | `src/ops/store.ts`, `src/ops/router.ts` |
+| Office screens | `src/ops/office/` |
+| Phone apps | `src/ops/phone/` |
+| Styles | `src/ops/styles/ops.css` |
+| Scenario checks | `tests/ops-scenarios.ts` |
+| Previous Pulse platform | `src/advanced/`, `src/oss/`, `src/views/`, `src/logic/` (`npm run verify` runs its 48 checks) |

@@ -98,7 +98,7 @@ Deterministic from the real date. About 1,000 fictional crew (Dublin heavy, nati
   short by 5 with exactly 8 eligible available, amber); Convention Centre Dublin awards dinner (2/12, red).
 - **Next two weeks**: mixed green, amber and red bookings at the same venues.
 - **Electric Picnic 2027** (Stradbally): build, festival and derig shifts, partially staffed.
-- **Ryder Cup 2027** (Adare Manor): about 60 shifts over seven days at four locations with eight supervisors, around
+- **Ryder Cup 2027** (Adare Manor): 46 shifts over seven days at four locations with eight supervisors, around
   860 positions on peak days, partially staffed with offers out.
 - Named crew personas for the phone (flagged so simulated crowd activity never acts for them), a Stamp 2 worker near 20 h,
   a worker whose Stamp 2 permission has expired (scenario 5), and workers with expiring and missing documents.
