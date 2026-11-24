@@ -1,20 +1,21 @@
-import { LogicHost } from "./runtime/logic";
-import PulseLogic from "./logic/PulseLogic";
-import AppShell from "./views/AppShell";
+import { lazy, Suspense } from "react";
+import OpsApp from "./ops/OpsApp";
 
-/* ── Backgrounds: change these per client ──────────────────────────────────
-   Any CSS colour works (#hex, rgb(), oklch()). One colour each; the shading
-   is worked out for you. */
-const config = {
-  /** Abstract background behind the Dashboard's KPI band. Hidden in the light theme. */
-  dashboardBackdrop: "#064B68",
-  /** Show the Dashboard background at all. */
-  kpiBackdropOn: true,
-  /** Wash behind the Records hero (Files and Contacts) and the New record dialog.
-      Leave as "" to use the current theme's own gradient. */
-  recordsBackdrop: "",
-};
+/* Two experiences share this bundle entry:
+   - the simplified OSS events app (default), in src/ops;
+   - the previous Pulse demo, kept unchanged at /advanced (or #advanced). */
+const AdvancedApp = lazy(() => import("./advanced/AdvancedApp"));
+
+const isAdvanced = () =>
+  typeof window !== "undefined" && (window.location.pathname.startsWith("/advanced") || window.location.hash === "#advanced");
 
 export default function App() {
-  return <LogicHost logic={PulseLogic} view={AppShell} props={config} />;
+  if (isAdvanced()) {
+    return (
+      <Suspense fallback={null}>
+        <AdvancedApp />
+      </Suspense>
+    );
+  }
+  return <OpsApp />;
 }
