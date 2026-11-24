@@ -116,6 +116,9 @@ function UserMenu() {
           <button className="item" onClick={() => { setUi({ theme: s.ui.theme === "light" ? "dark" : "light" }); close(); }}>
             <Icon d={s.ui.theme === "light" ? I.moon : I.sun} />{s.ui.theme === "light" ? "Dark theme" : "Light theme"}
           </button>
+          <button className="item" onClick={() => { close(); if (window.innerWidth < 900) go("/m/supervisor"); else setUi({ view: "supervisor" }); }}><Icon d={I.phone} />Supervisor app</button>
+          <button className="item" onClick={() => { close(); if (window.innerWidth < 900) go("/m/crew"); else setUi({ view: "crew" }); }}><Icon d={I.phone} />Crew app</button>
+          <div className="sep" />
           <button className="item" onClick={() => { close(); go("/settings/rules"); }}><Icon d={I.settings} />Settings</button>
           <a className="item" href="/advanced" style={{ textDecoration: "none" }}><Icon d={I.arrowR} />Previous full platform</a>
         </>

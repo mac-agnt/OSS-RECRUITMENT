@@ -346,7 +346,9 @@ export function offerReplacement(d: OpsState, asgId: string, workerId: string): 
 }
 /** Confirm a standby worker straight onto the roster, standing down the worker they replace if still booked. */
 export function promoteStandby(d: OpsState, standbyId: string, replacesAsgId?: string): Result {
-  const x = denied(d, "allocate", "confirm a replacement"); if (x) return x;
+  // Supervisors on site can confirm a standby replacement as well as the office.
+  const x = denied(d, "allocate", "confirm a replacement");
+  if (x && denied(d, "supervise", "confirm a replacement")) return x;
   const b = d.standby.find((z) => z.id === standbyId); if (!b) return no("That worker is no longer on standby.");
   const sh = shift(d, b.shiftId), w = worker(d, b.workerId);
   const e = eligibility(d, w.id, sh.id, b.role);
@@ -362,6 +364,21 @@ export function promoteStandby(d: OpsState, standbyId: string, replacesAsgId?: s
   const c = coverage(d, sh.id, b.role);
   audit(d, "standby.promoted", actorName(d) + " confirmed " + w.name + " from standby" + (swap ? ", replacing " + worker(d, original!.workerId).name : "") + "; " + c.confirmed + "/" + c.required, { type: "assignment", id: a.id });
   return ok(w.name + " confirmed from standby.", { asgId: a.id });
+}
+
+/** Supervisor on site asks the office to replace someone (missing or not coming). */
+export function requestReplacement(d: OpsState, asgId: string, note: string): Result {
+  const x = denied(d, "supervise", "request a replacement"); if (x) return x;
+  const a = asg(d, asgId);
+  if (a.status !== "confirmed") return no("They're no longer on this shift.");
+  if (okClock(d, a.id, "in")) return no("Already clocked in.");
+  const sh = shift(d, a.shiftId), w = worker(d, a.workerId);
+  a.flaggedAt = a.flaggedAt || d.clock;
+  if (!d.exceptions.some((e) => e.asgId === a.id && e.type === "no_response" && e.status === "open"))
+    d.exceptions.push({ id: nid(d, "X"), asgId: a.id, type: "no_response", status: "open", at: d.clock, key: "sup:" + a.id + ":" + d.seq, detail: actorName(d) + " asked for a replacement" + (note.trim() ? ": " + note.trim() : "") });
+  post(d, { threadId: eventThread(d, sh.eventId).id, kind: "message", to: ["office"], body: "Replacement needed for " + w.name + " (" + a.role.toLowerCase() + ", " + sh.label.toLowerCase() + ")" + (note.trim() ? ": " + note.trim() : "") + "." });
+  audit(d, "replacement.requested", actorName(d) + " requested a replacement for " + w.name + ", " + shiftWhen(d, sh), { type: "assignment", id: a.id });
+  return ok("The office has been asked to replace " + w.name.split(" ")[0] + ". A standby worker can be confirmed straight away.");
 }
 
 export { offerBody };
