@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "import-design": "node tools/import-design.mjs \"design/Pulse v5 Harbour.dc.html\"",
-    "verify": "esbuild tests/scenario.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/oss-verify.mjs --log-level=warning && node node_modules/.cache/oss-verify.mjs"
+    "verify": "esbuild tests/scenario.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/oss-verify.mjs --log-level=warning && node node_modules/.cache/oss-verify.mjs",
+    "verify:ops": "esbuild tests/ops-scenarios.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/ops-verify.mjs --log-level=warning && node node_modules/.cache/ops-verify.mjs"
   },
   "dependencies": {
     "react": "18.3.1",
