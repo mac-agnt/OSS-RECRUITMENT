@@ -22,12 +22,14 @@ export function audit(d: OpsState, action: string, summary: string, ref?: { type
 }
 
 /** Permission check for office and supervisor users. Returns a refusal, or null when allowed. */
-export function denied(d: OpsState, perm: Perm, what: string): Result | null {
+export function denied(d: OpsState, perm: Perm | Perm[], what: string): Result | null {
   const id = actorId(d);
   if (id === "system") return null;
+  const perms = Array.isArray(perm) ? perm : [perm];
   const u = user(d, id);
-  if (u && u.perms.includes(perm)) return null;
-  const holders = d.users.filter((x) => x.perms.includes(perm) && x.kind === "office").map((x) => x.name);
+  // Allowed if the person holds any of the permissions; only a real refusal is audited.
+  if (u && perms.some((p) => u.perms.includes(p))) return null;
+  const holders = d.users.filter((x) => perms.some((p) => x.perms.includes(p)) && x.kind === "office").map((x) => x.name);
   audit(d, "permission.denied", actorName(d) + " tried to " + what + " without permission");
   return no(actorName(d) + " can't " + what + ". " + (holders.length ? "Ask " + holders.slice(0, 2).join(" or ") + "." : ""));
 }

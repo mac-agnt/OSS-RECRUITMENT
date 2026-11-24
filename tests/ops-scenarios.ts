@@ -6,7 +6,7 @@ import type { OpsState, Result } from "../src/ops/model";
 import { buildSeed, PERSONAS } from "../src/ops/seed";
 import * as E from "../src/ops/engine";
 import * as Q from "../src/ops/selectors";
-import { addDays, atDay, dayKey } from "../src/ops/time";
+import { addDays, addMin, atDay, dayKey, fmtTime, minutesBetween, ms } from "../src/ops/time";
 
 let passed = 0, failed = 0;
 function check(name: string, fn: () => void) {
@@ -21,6 +21,12 @@ function as<A extends unknown[]>(d: OpsState, actor: string, fn: (d: OpsState, .
 const okr = (r: Result) => { assert.ok(r.ok, r.msg); return r; };
 const ev = (s: OpsState, prefix: string) => s.events.find((e) => e.name.startsWith(prefix) && Q.eventsOnDay(s, dayKey(s.clock)).includes(e))!;
 const shiftOf = (s: OpsState, evId: string, label: string) => s.shifts.find((x) => x.eventId === evId && x.label === label)!;
+/** The event as the edit form would load it. */
+const formOf = (d: OpsState, evId: string): E.EventForm => {
+  const e = Q.event(d, evId);
+  return { id: e.id, name: e.name, clientId: e.clientId, venueId: e.venueId, supervisorId: e.supervisorId, instructions: e.instructions, ppe: [...e.ppe], quals: [...e.quals],
+    shifts: Q.shiftsOf(d, evId).map((x) => ({ id: x.id, label: x.label, date: dayKey(x.start), start: fmtTime(x.start), end: fmtTime(x.end), needs: x.needs.map((n) => ({ ...n })), supervisorId: x.supervisorId, venueId: x.venueId })) };
+};
 
 const DAY = "2026-11-24";
 const base = buildSeed(DAY);
@@ -366,6 +372,194 @@ check("emergency registration is not verification", () => {
   const doc = d.docs.find((x) => x.workerId === w.id)!;
   okr(as(d, "U1", E.verifyDoc, doc.id, true));
   assert.equal(Q.worker(d, w.id).status, "active");
+});
+
+console.log("Regression checks");
+check("a travel reply sent before the 2 h prompt counts; someone booked after the prompt isn't flagged", () => {
+  const d = fresh();
+  d.ui.crowd = false;
+  const gs = Q.shiftsOf(d, ev(d, "Guinness").id)[0];
+  const crew = Q.confirmedOf(d, gs.id);
+  const early = crew[0], gone = crew[1];
+  okr(as(d, "U1", E.advance, atDay(DAY, "08:05")));
+  okr(as(d, early.workerId, E.replyCode, early.workerId, early.id, "on_way"));
+  okr(as(d, "U1", E.advance, atDay(DAY, "08:40")));
+  assert.equal(d.messages.filter((m) => m.kind === "travel" && m.ref?.id === gs.id).length, 1, "travel prompt sent");
+  okr(as(d, "U1", E.removeAssignment, gone.id, "Moved to another job"));
+  const cand = Q.eligibleAvailable(d, gs.id, gone.role)[0] || Q.candidates(d, gs.id, gone.role).find((c) => c.e.status === "eligible" || c.e.status === "warning")!;
+  const late = okr(as(d, "U1", E.assignManual, gs.id, gone.role, cand.w.id, "Booked after the travel check"));
+  okr(as(d, "U1", E.advance, atDay(DAY, "09:50")));
+  assert.ok(d.autoRuns.some((r) => r.key === "noreply:" + gs.id + ":v1"));
+  assert.equal(Q.asg(d, early.id).flaggedAt, undefined, "replied on my way 2 h 25 min before");
+  assert.equal(Q.asg(d, late.data.asgId).flaggedAt, undefined, "booked after the prompt went out");
+  assert.ok(Q.confirmedOf(d, gs.id).some((a) => a.flaggedAt), "people who never replied are flagged");
+});
+check("deleting a shift with past offers and standby leaves nothing pointing at it", () => {
+  const d = fresh();
+  const day = addDays(DAY, 3);
+  const r = okr(as(d, "U1", E.saveEvent, { name: "Test: day and night", clientId: "C01", venueId: "V01", supervisorId: "S1", instructions: "", ppe: [], quals: [],
+    shifts: [{ label: "Day crew", date: day, start: "09:00", end: "15:00", needs: [{ role: "Event crew", count: 2 }] },
+      { label: "Night crew", date: day, start: "18:00", end: "23:00", needs: [{ role: "Event crew", count: 2 }] }] }));
+  const night = Q.shiftsOf(d, r.data.id)[1];
+  const list = Q.candidates(d, night.id, "Event crew", { available: true }).slice(0, 4).map((c) => c.w.id);
+  okr(as(d, "U1", E.sendOffers, night.id, "Event crew", list));
+  const offerFor = (w: string) => d.offers.find((o) => o.shiftId === night.id && o.workerId === w)!.id;
+  const acc = okr(as(d, list[0], E.respondOffer, offerFor(list[0]), "accept"));
+  okr(as(d, list[1], E.respondOffer, offerFor(list[1]), "decline"));
+  okr(as(d, "U1", E.addStandby, night.id, "Event crew", list[2]));
+  const f = formOf(d, r.data.id);
+  f.shifts = f.shifts.slice(0, 1);
+  assert.equal(as(d, "U1", E.saveEvent, f).ok, false, "confirmed crew block the delete");
+  okr(as(d, "U1", E.removeAssignment, acc.data.asgId, "Client cut the night shift"));
+  okr(as(d, "U1", E.saveEvent, f));
+  assert.equal(Q.shiftsOf(d, r.data.id).length, 1);
+  const shiftIds = new Set(d.shifts.map((x) => x.id)), asgIds = new Set(d.assignments.map((a) => a.id));
+  assert.ok(d.assignments.every((a) => shiftIds.has(a.shiftId)), "assignments");
+  assert.ok(d.offers.every((o) => shiftIds.has(o.shiftId)), "offers");
+  assert.ok(d.standby.every((b) => shiftIds.has(b.shiftId)), "standby");
+  assert.ok(d.updates.every((u) => asgIds.has(u.asgId)) && d.clocks.every((c) => asgIds.has(c.asgId)) && d.exceptions.every((x) => asgIds.has(x.asgId)) && d.approvals.every((p) => asgIds.has(p.asgId)));
+  for (const w of list) Q.asgsOfWorker(d, w).forEach((a) => Q.asgView(d, a.id));
+  Q.alerts(d); Q.lines(d);
+});
+check("moving a shift onto a time its crew are already booked is refused", () => {
+  const d = fresh();
+  const nac = Q.shiftsOf(d, ev(d, "National Aquatic").id)[0];
+  const startBefore = nac.start;
+  const other = Q.asgsOfWorker(d, PERSONAS.maria).map((a) => ({ a, sh: Q.shift(d, a.shiftId) }))
+    .find(({ a, sh }) => a.status === "confirmed" && sh.id !== nac.id && ms(sh.start) > ms(d.clock))!;
+  const f = formOf(d, nac.eventId);
+  f.shifts[0] = { ...f.shifts[0], date: dayKey(other.sh.start), start: fmtTime(other.sh.start), end: fmtTime(other.sh.end) };
+  const r = as(d, "U1", E.saveEvent, f);
+  assert.equal(r.ok, false);
+  assert.ok(r.data?.clashes?.some((c: string) => c.startsWith("Maria Santos")), r.msg);
+  assert.equal(Q.shift(d, nac.id).start, startBefore, "the shift keeps its time");
+});
+check("confirming a standby who breaks a soft rule needs a reason, which is stored", () => {
+  const d = fresh();
+  const aviva = shiftOf(d, ev(d, "Aviva").id, "Stewards");
+  okr(as(d, "U1", E.addStandby, aviva.id, "Steward", PERSONAS.maria));
+  const sb = d.standby.find((b) => b.shiftId === aviva.id && b.workerId === PERSONAS.maria)!;
+  const r1 = as(d, "U1", E.promoteStandby, sb.id);
+  assert.equal(r1.ok, false);
+  assert.ok(r1.data?.needsReason?.some((x: string) => /Stamp 2/.test(x)), r1.msg);
+  const r2 = okr(as(d, "U1", E.promoteStandby, sb.id, undefined, "College reading week, agreed with Maria"));
+  assert.ok(Q.asg(d, r2.data.asgId).override?.reason.includes("reading week"));
+});
+check("a phone clock-out long after the finish is refused; the supervisor records it", () => {
+  const d = fresh();
+  d.ui.crowd = false;
+  const load = shiftOf(d, ev(d, "3Arena").id, "Load-in crew");
+  const a = Q.confirmedOf(d, load.id).find((x) => x.workerId === PERSONAS.ciaran)!;
+  okr(as(d, "U1", E.advance, atDay(DAY, "11:58")));
+  okr(as(d, PERSONAS.ciaran, E.clockIn, a.id, { method: "gps", distanceM: 20 }));
+  okr(as(d, "U1", E.advance, atDay(DAY, "17:45")));
+  const late = as(d, PERSONAS.ciaran, E.clockOut, a.id, { method: "gps", distanceM: 20 });
+  assert.equal(late.ok, false);
+  assert.match(late.msg, /finished at 17:00/);
+  okr(as(d, "S4", E.correctClock, a.id, "out", "17:05", "Signed out with me at the dock"));
+  assert.equal(fmtTime(Q.line(d, a.id)!.outAt!), "17:05");
+});
+check("removing someone closes their open exceptions and withdraws replacement offers", () => {
+  const d = fresh();
+  const sh = Q.shiftsOf(d, ev(d, "National Aquatic").id)[0];
+  const who = Q.confirmedOf(d, sh.id).find((a) => d.exceptions.some((x) => x.asgId === a.id && x.status === "open"))!;
+  assert.ok(who, "need someone with an open exception");
+  const cand = Q.candidates(d, sh.id, who.role).find((c) => c.e.status === "eligible" || c.e.status === "warning")!;
+  okr(as(d, "U1", E.offerReplacement, who.id, cand.w.id));
+  okr(as(d, "U1", E.removeAssignment, who.id, "Sent home"));
+  assert.ok(!d.exceptions.some((x) => x.asgId === who.id && x.status === "open"));
+  assert.ok(!d.offers.some((o) => o.replaces === who.id && o.status === "sent"));
+});
+check("a permission refusal is audited; an allowed second permission isn't", () => {
+  const d = fresh();
+  const denials = () => d.audit.filter((a) => a.action === "permission.denied").length;
+  const before = denials();
+  const open = d.exceptions.filter((x) => x.status === "open" && x.type !== "missing_out");
+  okr(as(d, "U1", E.resolveException, open[0].id, "Phoned them, all fine"));
+  assert.equal(denials(), before, "Daniele approves hours, so no refusal is logged");
+  assert.equal(as(d, "U4", E.resolveException, open[1].id, "Not mine to do").ok, false);
+  assert.equal(denials(), before + 1);
+});
+check("Maria's Stamp 2 week stays under 20 hours whatever day the demo opens", () => {
+  for (const day of ["2026-11-24", "2026-11-28", "2026-11-29", "2026-11-30"]) {
+    const s = day === DAY ? base : buildSeed(day);
+    const m = Q.weekMinutes(s, PERSONAS.maria, s.clock);
+    assert.ok(m >= 13.5 * 60 && m <= 18 * 60, day + ": " + (m / 60).toFixed(2) + " h");
+  }
+});
+check("standby order is numbered per shift and can be changed", () => {
+  const d = fresh();
+  for (const sid of new Set(d.standby.map((b) => b.shiftId))) {
+    const orders = d.standby.filter((b) => b.shiftId === sid).map((b) => b.order).sort((a, b) => a - b);
+    assert.deepEqual(orders, orders.map((_, i) => i + 1), sid);
+  }
+  const sh = Q.shiftsOf(d, ev(d, "National Aquatic").id)[0];
+  const [first, second] = Q.standbyOf(d, sh.id);
+  okr(as(d, "U1", E.moveStandby, second.id, -1));
+  const now = Q.standbyOf(d, sh.id);
+  assert.deepEqual([now[0].id, now[1].id], [second.id, first.id]);
+});
+check("an exported payroll file never changes; exported hours can't be corrected", () => {
+  const d = fresh();
+  const x = d.exports[0];
+  assert.equal(x.rows?.length, x.asgIds.length, "seeded export keeps its rows");
+  const before = JSON.stringify(x.rows);
+  const asgId = x.asgIds[0].split(":")[0];
+  const role = Q.asg(d, asgId).role;
+  okr(as(d, "U1", E.setRate, role, d.rules.rates[role] + 3));
+  assert.equal(JSON.stringify(d.exports[0].rows), before);
+  const c = as(d, "U1", E.correctClock, asgId, "out", "23:59", "Late correction attempt");
+  assert.equal(c.ok, false);
+  assert.match(c.msg, /already exported/);
+  assert.equal(as(d, "U1", E.reopenLine, asgId, "Wrong rate").ok, false);
+});
+check("an offline clock-in captured outside the radius is rejected when it syncs", () => {
+  const d = fresh();
+  d.ui.crowd = false;
+  const show = shiftOf(d, ev(d, "3Arena").id, "Show crew");
+  const a = Q.confirmedOf(d, show.id).find((x) => x.workerId === PERSONAS.tomasz)!;
+  okr(as(d, "U1", E.advance, atDay(DAY, "17:20")));
+  okr(as(d, PERSONAS.tomasz, E.clockIn, a.id, { method: "gps", distanceM: 240, offline: true }));
+  assert.equal(as(d, PERSONAS.tomasz, E.syncOffline, a.id).ok, false);
+  assert.ok(!Q.okClock(d, a.id, "in"));
+  assert.ok(d.exceptions.some((x) => x.asgId === a.id && x.type === "outside" && x.status === "open"));
+});
+check("overnight shifts across the clock changes end at the right local time", () => {
+  const d = fresh();
+  const make = (date: string, start: string, end: string) => {
+    const r = okr(as(d, "U1", E.saveEvent, { name: "Test: night " + date, clientId: "C01", venueId: "V01", supervisorId: "S1", instructions: "", ppe: [], quals: [],
+      shifts: [{ label: "Night crew", date, start, end, needs: [{ role: "Event crew", count: 2 }] }] }));
+    return Q.shiftsOf(d, r.data.id)[0];
+  };
+  const oct = make("2027-10-30", "18:00", "02:00");
+  assert.deepEqual([dayKey(oct.end), fmtTime(oct.end), minutesBetween(oct.start, oct.end)], ["2027-10-31", "02:00", 9 * 60], "clocks go back an hour");
+  const mar = make("2027-03-27", "20:00", "04:00");
+  assert.deepEqual([dayKey(mar.end), fmtTime(mar.end), minutesBetween(mar.start, mar.end)], ["2027-03-28", "04:00", 7 * 60], "clocks go forward an hour");
+});
+check("an offer can't be accepted once its shift has finished", () => {
+  const d = fresh();
+  const o = d.offers.find((x) => x.status === "sent" && Q.shift(d, x.shiftId).start.startsWith(DAY))!;
+  const sh = Q.shift(d, o.shiftId);
+  o.expiresAt = addMin(sh.end, 600);
+  d.clock = addMin(sh.end, 5);
+  const r = as(d, o.workerId, E.respondOffer, o.id, "accept");
+  assert.equal(r.ok, false);
+  assert.match(r.msg, /already finished/);
+});
+check("a no-show leaves the timesheets instead of needing invented times", () => {
+  const d = fresh();
+  d.ui.crowd = false;
+  const gs = Q.shiftsOf(d, ev(d, "Guinness").id)[0];
+  const a = Q.confirmedOf(d, gs.id)[0];
+  assert.equal(as(d, "S3", E.markNoShow, a.id, "").ok, false, "not before the start");
+  okr(as(d, "U1", E.advance, atDay(DAY, "11:30")));
+  okr(as(d, "S3", E.markNoShow, a.id, "Didn't turn up, phone off"));
+  assert.equal(Q.asg(d, a.id).status, "cancelled");
+  assert.equal(Q.line(d, a.id), null);
+  assert.ok(!d.exceptions.some((x) => x.asgId === a.id && x.status === "open"));
+  const b = Q.confirmedOf(d, gs.id)[0];
+  okr(as(d, "S3", E.correctClock, b.id, "in", "10:30", "Saw them arrive at the staff door"));
+  assert.equal(as(d, "S3", E.markNoShow, b.id, "").ok, false, "someone who clocked in isn't a no-show");
 });
 
 console.log("\n" + passed + " passed" + (failed ? ", " + failed + " failed" : ""));

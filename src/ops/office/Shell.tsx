@@ -37,7 +37,7 @@ function counts(s: OpsState) {
   return {
     today: alerts.filter((a) => a.tone === "bad").length,
     comms: Q.unreadForOffice(s).length,
-    timesheets: Q.lines(s, { status: ["office"] }).length,
+    timesheets: Q.officeQueue(s),
     compliance: s.docs.filter((d) => d.status === "pending").length
   };
 }

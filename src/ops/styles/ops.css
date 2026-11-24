@@ -470,6 +470,7 @@ body { background: #f5f6f8; }
 .m-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 21; background: var(--surface); border-radius: 18px 18px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px;
   max-height: 85%; overflow: auto; animation: sheetin 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .m-full .m-sheet-scrim, .m-full .m-sheet { position: fixed; }
+.m-full .m-sheet { max-width: 560px; margin: 0 auto; }
 @keyframes sheetin { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
 .m-chat { display: flex; flex-direction: column; gap: 8px; }
 .m-chat .bubble { max-width: 88%; font-size: 14.5px; }

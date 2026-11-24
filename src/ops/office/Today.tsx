@@ -6,7 +6,7 @@ import { go, Link } from "../router";
 import { useOps } from "../store";
 import { fmtDateLong, hourOf } from "../time";
 import { Btn, I, Icon, Panel } from "../ui/kit";
-import { dayRows, Page, plural, ShiftBoard } from "./common";
+import { Page, plural, ShiftBoard } from "./common";
 
 export default function Today() {
   const s = useOps();
@@ -15,7 +15,7 @@ export default function Today() {
   const me = Q.user(s, s.ui.officeId)!;
   const h = hourOf(s.clock);
   const greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-  const rows = dayRows(s, t.day);
+  const rows = useMemo(() => Q.todayShifts(s), [s]);
   const stats: { n: number; label: string; tone?: "bad" | "warn" | "ok"; to: string }[] = [
     { n: t.events.length, label: "Events today", to: "/events?view=day" },
     { n: t.required, label: "Workers required", to: "/events?view=day" },

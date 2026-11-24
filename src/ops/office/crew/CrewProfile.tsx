@@ -143,11 +143,11 @@ export default function CrewProfile({ id }: { id: string }) {
   if (!w) return <Page title="Worker not found" back={{ to: "/crew", label: "Crew" }}><Notice tone="warn">No worker with this reference in the demo data.</Notice></Page>;
   const tab = r.q.get("tab") || "overview";
   const comp = Q.compliance(s, w.id);
-  const asgs = Q.asgsOfWorker(s, w.id);
+  const asgs = Q.asgsOfWorker(s, w.id).filter((a) => !!Q.shift(s, a.shiftId));
   const now = ms(s.clock);
   const upcoming = asgs.filter((a) => a.status === "confirmed" && ms(Q.shift(s, a.shiftId).end) > now).sort((a, b) => Q.shift(s, a.shiftId).start.localeCompare(Q.shift(s, b.shiftId).start));
   const previous = asgs.filter((a) => ms(Q.shift(s, a.shiftId).end) <= now || a.status !== "confirmed").sort((a, b) => Q.shift(s, b.shiftId).start.localeCompare(Q.shift(s, a.shiftId).start));
-  const offers = Q.offersOfWorker(s, w.id).filter((o) => Q.isOpenOffer(s, o));
+  const offers = Q.offersOfWorker(s, w.id).filter((o) => Q.isOpenOffer(s, o) && !!Q.shift(s, o.shiftId));
   const ls = Q.lines(s, { workerId: w.id });
   const t = Q.lineTotals(ls);
   const wk = Q.weekMinutes(s, w.id, s.clock), lim = Q.weekLimit(s, w);

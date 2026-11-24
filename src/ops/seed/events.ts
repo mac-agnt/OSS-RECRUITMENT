@@ -45,7 +45,7 @@ export function buildRosters(s: OpsState, today: string) {
   const sh = (e: Event, label: string, day: string, start: string, end: string, needs: Need[], o: { venueId?: string; supervisorId?: string } = {}): Shift => {
     const st = atDay(day, start);
     let en = atDay(day, end);
-    if (ms(en) <= ms(st)) en = addMin(en, 24 * 60);
+    if (ms(en) <= ms(st)) en = atDay(day, end, 1);
     const x: Shift = { id: id("S"), eventId: e.id, label, start: st, end: en, needs, venueId: o.venueId, supervisorId: o.supervisorId, version: 1 };
     shifts.push(x); return x;
   };
@@ -113,7 +113,8 @@ export function buildRosters(s: OpsState, today: string) {
   };
   const place = (wid: string, x: Shift, role: string) => { const w = s.workers.find((z) => z.id === wid)!; const a = assign(w, x, role, addMin(x.start, -3 * 24 * 60)); setAvail(w, x); return a; };
   const offer = (x: Shift, role: string, workerId: string, sentAt: string, hours = 24, kind: "standard" | "replacement" = "standard") => {
-    s.offers.push({ id: id("O"), shiftId: x.id, workerId, role, status: "sent", sentAt, sentBy: "U1", expiresAt: addMin(sentAt, hours * 60), kind });
+    const exp = addMin(sentAt, hours * 60), cap = addMin(x.start, -30);
+    s.offers.push({ id: id("O"), shiftId: x.id, workerId, role, status: "sent", sentAt, sentBy: "U1", expiresAt: ms(exp) < ms(cap) ? exp : cap, kind });
   };
   const offerTo = (x: Shift, role: string, n: number, sentAt: string, hours = 24, o: FillOpts = {}) => {
     let k = 0;
@@ -129,7 +130,8 @@ export function buildRosters(s: OpsState, today: string) {
     for (const w of order(byRole.get(role) || [], "sb" + x.id + role, "dublin")) {
       if (k >= n) break;
       if (!canWork(w, x, role, {})) continue;
-      s.standby.push({ id: id("SB"), shiftId: x.id, workerId: w.id, role, order: ++k, at: addMin(x.start, -26 * 60), source: "office" });
+      s.standby.push({ id: id("SB"), shiftId: x.id, workerId: w.id, role, order: s.standby.filter((b) => b.shiftId === x.id).length + 1, at: addMin(x.start, -26 * 60), source: "office" });
+      k++;
       setAvail(w, x);
     }
   };
@@ -188,7 +190,7 @@ export function buildRosters(s: OpsState, today: string) {
     hist.push(...worked([...pre, ...rest], x, sup, { office: T(-1, "09:10") }));
   };
   doneShift(h1s, "S1", []);
-  doneShift(h2a, "S2", [[PERSONAS.maria, "Steward"]]);
+  doneShift(h2a, "S2", addDays(today, -5) >= weekStartKey(T(0, "12:00")) ? [] : [[PERSONAS.maria, "Steward"]]);
   doneShift(h2b, "S2", []);
   doneShift(h3s, "S3", [[PERSONAS.priya, "Catering assistant"], [PERSONAS.aoife, "Bar staff"]]);
   doneShift(h4a, "S4", [[PERSONAS.ciaran, "Stagehand"]]);
@@ -289,7 +291,12 @@ export function buildRosters(s: OpsState, today: string) {
   /* Maria's other shifts this week, so her Stamp 2 hours are close to the limit. */
   const ws = weekStartKey(T(0, "12:00"));
   const otherDays = [1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5, -6].map((k) => addDays(today, k)).filter((dd) => dd >= ws && dd <= addDays(ws, 6) && dd !== addDays(today, -1)).slice(0, 2);
+  const inWeek = (x: Shift) => dayKey(x.start) >= ws && dayKey(x.start) <= addDays(ws, 6);
+  let mariaMin = s.assignments.filter((a) => a.workerId === PERSONAS.maria && a.status === "confirmed")
+    .map((a) => s.shifts.find((x) => x.id === a.shiftId)!).filter(inWeek).reduce((t, x) => t + minutesBetween(x.start, x.end), 0);
   otherDays.forEach((dd, k) => {
+    if (mariaMin + 240 > 17.5 * 60) return;
+    mariaMin += 240;
     const e = ev("E-M" + k, "Guinness Storehouse: private tour hosts", "C04", "V04", "S3", { ppe: ["Black uniform"], instructions: "Hosting private tours of the Storehouse." });
     const x = sh(e, "Tour hosts", dd, k ? "17:00" : "10:00", k ? "21:00" : "14:00", [{ role: "Hospitality host", count: 4 }]);
     const list = [place(PERSONAS.maria, x, "Hospitality host"), ...fill(x, "Hospitality host", 3)];

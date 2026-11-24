@@ -6,7 +6,7 @@
 import type { Code, OpsState, Result, Rules } from "../model";
 import { DOC_LABEL } from "../model";
 import {
-  asgsOfShift, confirmedOf, docState, event, isOpenOffer, okClock, clocksOf, replacementFor, replacementsFor, shift, shiftVenue, updatesOf, worker
+  asgsOfShift, confirmedOf, docState, event, isOpenOffer, okClock, clocksOf, replacementFor, replacementsFor, shift, shiftVenue, travelReplied, updatesOf, worker
 } from "../selectors";
 import { roll } from "../rand";
 import { addDays, dayKey, fmtDay, fmtTime, ms, zoned } from "../time";
@@ -62,7 +62,8 @@ function autoNoReply(d: OpsState, shiftId: string) {
   if (!once(d, key)) return;
   const prompt = d.autoRuns.find((r) => r.key === "travel:" + sh.id + ":v" + sh.version);
   if (!prompt) { mark(d, key, "noreply", "No travel check was sent"); return; }
-  const flagged = confirmedOf(d, sh.id).filter((a) => !okClock(d, a.id, "in") && !updatesOf(d, a.id).some((u) => ms(u.at) >= ms(prompt.at) && u.code !== "confirmed"));
+  // Only people booked when the travel check went out, who haven't given any travel reply in the window.
+  const flagged = confirmedOf(d, sh.id).filter((a) => ms(a.at) <= ms(prompt.at) && !okClock(d, a.id, "in") && !travelReplied(d, a));
   mark(d, key, "noreply", flagged.length + " flagged");
   if (!flagged.length) return;
   const ev = event(d, sh.eventId);

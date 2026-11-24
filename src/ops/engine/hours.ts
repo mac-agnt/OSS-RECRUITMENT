@@ -42,6 +42,7 @@ export function reopenLine(d: OpsState, asgId: string, reason: string): Result {
   if (!reason.trim()) return no("Give a reason.");
   const l = line(d, asgId);
   if (!l || !(l.sup || l.office)) return no("Only an approved timesheet can be reopened.");
+  if (l.status === "exported") return no("Already exported to payroll on " + l.exportId + ". Changes after export are a payroll adjustment (to agree with OSS).");
   for (const a of d.approvals) if (a.asgId === asgId && a.version === l.version && !a.reopened) a.reopened = d.clock;
   d.approvals.push({ id: nid(d, "AP"), asgId, stage: "office", by: actorId(d), at: d.clock, version: l.version, reopened: d.clock });
   audit(d, "hours.reopened", actorName(d) + " reopened " + l.w.name + "'s timesheet (" + reason.trim() + "); it needs approval again", { type: "assignment", id: asgId });
@@ -66,16 +67,15 @@ export function exportSage(d: OpsState, asgIds: string[]): Result {
   const period = days[0] === days[days.length - 1] ? fmtDay(days[0]) : fmtDay(days[0]) + " to " + fmtDay(days[days.length - 1]);
   const minutes = ls.reduce((t, l) => t + l.payableMin, 0);
   const amount = Math.round(ls.reduce((t, l) => t + l.pay, 0) * 100) / 100;
-  d.exports.push({ id, at: d.clock, by: actorId(d), asgIds: ls.map((l) => l.a.id + ":" + l.version), period, minutes, amount, file: "oss-sage-payroll-" + id.toLowerCase() + ".csv" });
   const rows = ls.map((l) => sageRow(d, l, id));
+  d.exports.push({ id, at: d.clock, by: actorId(d), asgIds: ls.map((l) => l.a.id + ":" + l.version), period, minutes, amount, file: "oss-sage-payroll-" + id.toLowerCase() + ".csv", rows });
   audit(d, "payroll.exported", actorName(d) + " exported " + ls.length + " approved timesheets to the Sage file " + id + " (" + period + ", " + fmtHM(minutes) + ", " + fmtMoney(amount) + "); file only, not sent to Sage", { type: "export", id }, true);
   return ok("Exported " + ls.length + " lines (" + fmtHM(minutes) + ", " + fmtMoney(amount) + "). Download the CSV to import into Sage.", { id, rows, header: SAGE_HEADER, file: "oss-sage-payroll-" + id.toLowerCase() + ".csv" });
 }
 
 /* ── Bullhorn (simulated two-way sync) ──────────────────────────────────── */
 export function syncBullhorn(d: OpsState): Result {
-  const x = denied(d, "payroll", "run the Bullhorn sync");
-  if (x && denied(d, "manage", "run the Bullhorn sync")) return x;
+  const x = denied(d, ["payroll", "manage"], "run the Bullhorn sync"); if (x) return x;
   const pending = d.workers.filter((w) => w.bullhornState === "pending");
   const unlinked = d.workers.filter((w) => w.bullhornState === "not_linked" && w.status === "active");
   for (const w of pending) w.bullhornState = "synced";

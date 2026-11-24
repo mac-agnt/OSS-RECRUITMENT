@@ -132,6 +132,12 @@ function ShiftCard({ s, ev, sh, onFind }: { s: OpsState; ev: Event; sh: Shift; o
   const [page, setPage] = useState(0);
   const [removing, setRemoving] = useState<Assignment | null>(null);
   const [showOffers, setShowOffers] = useState(false);
+  const [override, setOverride] = useState<{ standbyId: string; replaces?: string; rules: string[] } | null>(null);
+  const [why, setWhy] = useState("");
+  const promote = (standbyId: string, replaces?: string) => {
+    const res = office(E.promoteStandby, standbyId, replaces);
+    if (!res.ok && res.data?.needsReason) { setWhy(""); setOverride({ standbyId, replaces, rules: res.data.needsReason }); }
+  };
   const st = Q.staffStatus(s, ev.id, [sh]);
   const conf = Q.confirmedOf(s, sh.id);
   const flagged = conf.filter((a) => a.flaggedAt);
@@ -180,7 +186,7 @@ function ShiftCard({ s, ev, sh, onFind }: { s: OpsState; ev: Event; sh: Shift; o
               {pending ? <> Replacement offer out to <b>{Q.worker(s, pending.workerId).name}</b>.</> : rec ? <> Recommended: <b>{Q.worker(s, rec.workerId).name}</b>{rec.from === "standby" ? " (standby)" : " (eligible, available)"}.</> : " No eligible replacement available."}</span>
             <div className="row wrap">
               <Btn size="sm" icon={I.phone} onClick={() => go("/comms?worker=" + w.id)}>Contact</Btn>
-              {!pending && rec?.standbyId && <Btn size="sm" kind="primary" onClick={() => office(E.promoteStandby, rec.standbyId!, a.id)}>Confirm {Q.worker(s, rec.workerId).name.split(" ")[0]}</Btn>}
+              {!pending && rec?.standbyId && <Btn size="sm" kind="primary" onClick={() => promote(rec.standbyId!, a.id)}>Confirm {Q.worker(s, rec.workerId).name.split(" ")[0]}</Btn>}
               {!pending && rec && !rec.standbyId && <Btn size="sm" kind="primary" onClick={() => office(E.offerReplacement, a.id, rec.workerId)}>Offer to {Q.worker(s, rec.workerId).name.split(" ")[0]}</Btn>}
               <Btn size="sm" onClick={() => onFind(sh.id, a.role, a.id)}>Choose someone else</Btn>
             </div>
@@ -244,7 +250,7 @@ function ShiftCard({ s, ev, sh, onFind }: { s: OpsState; ev: Event; sh: Shift; o
                   <div key={b.id} className="row small wrap">
                     <span className="num dim">{i + 1}.</span><span className="strong">{Q.worker(s, b.workerId).name}</span><span className="dim">{b.role}{b.source === "accepted_full" ? ", accepted after full" : ""}</span>
                     <span className="grow" />
-                    {upcoming && <Btn size="sm" kind={open ? "primary" : "secondary"} disabled={!open} title={open ? "Confirm onto the roster" : "No open place in this role"} onClick={() => office(E.promoteStandby, b.id)}>Confirm</Btn>}
+                    {upcoming && <Btn size="sm" kind={open ? "primary" : "secondary"} disabled={!open} title={open ? "Confirm onto the roster" : "No open place in this role"} onClick={() => promote(b.id)}>Confirm</Btn>}
                     <Btn size="sm" kind="quiet" icon={I.chevU} iconOnly title="Move up" onClick={() => office(E.moveStandby, b.id, -1)} />
                     <Btn size="sm" kind="quiet" icon={I.x} iconOnly title="Remove from standby" onClick={() => office(E.removeStandby, b.id)} />
                   </div>
@@ -263,6 +269,14 @@ function ShiftCard({ s, ev, sh, onFind }: { s: OpsState; ev: Event; sh: Shift; o
         </div>
       )}
       {removing && <RemoveDialog a={removing} onClose={() => setRemoving(null)} />}
+      {override && (
+        <Dialog title="Confirm with an override?" onClose={() => setOverride(null)}
+          actions={<><Btn onClick={() => setOverride(null)}>Cancel</Btn><Btn kind="primary" disabled={why.trim().length < 5}
+            onClick={() => { if (office(E.promoteStandby, override.standbyId, override.replaces, why).ok) setOverride(null); }}>Confirm with reason</Btn></>}>
+          <div className="stack g8"><span>This overrides: {override.rules.join("; ")}. The reason is kept in the audit log. Compliance rules can't be overridden.</span>
+            <input className="input" autoFocus placeholder="Reason, for example: holiday week, agreed with the student" value={why} onChange={(e) => setWhy(e.target.value)} aria-label="Override reason" /></div>
+        </Dialog>
+      )}
     </div>
   );
 }

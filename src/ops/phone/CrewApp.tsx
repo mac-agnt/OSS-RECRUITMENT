@@ -204,7 +204,8 @@ function Clock({ wid }: { wid: string }) {
   const s = useOps();
   const now = ms(s.clock);
   const [method, setMethod] = useState<"gps" | "qr">("gps");
-  const [where, setWhere] = useState<"here" | "near" | "far" | "offline">("here");
+  const [where, setWhere] = useState<"here" | "near" | "far">("here");
+  const [offline, setOffline] = useState(false);
   const [qr, setQr] = useState<"good" | "old">("good");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const mine = Q.asgsOfWorker(s, wid).filter((a) => a.status === "confirmed");
@@ -235,7 +236,7 @@ function Clock({ wid }: { wid: string }) {
   const dist = where === "here" ? 18 : where === "near" ? 46 : 240;
   const doClock = (kind: "in" | "out") => {
     const fn = kind === "in" ? E.clockIn : E.clockOut;
-    const r = act(wid, fn, v.a.id, { method, distanceM: dist, offline: where === "offline", token: qr === "good" ? E.qrToken(sh.id, sh.version) : "OSS-" + sh.id + "-v0" });
+    const r = act(wid, fn, v.a.id, { method, distanceM: dist, offline, token: qr === "good" ? E.qrToken(sh.id, sh.version) : "OSS-" + sh.id + "-v0" });
     setMsg({ ok: r.ok, text: r.msg });
   };
   return (
@@ -249,7 +250,7 @@ function Clock({ wid }: { wid: string }) {
       {msg && <Notice tone={msg.ok ? "ok" : "bad"}>{msg.text}</Notice>}
       {v.pendingSync && (
         <div className="m-card"><span className="strong">Saved on this phone</span><span className="small">No signal when you clocked. It syncs as soon as you're back online; your original time is kept.</span>
-          <Btn className="m-big" icon={I.refresh} onClick={() => setMsg({ ok: true, text: act(wid, E.syncOffline, v.a.id).msg })}>I'm back online: sync now</Btn></div>
+          <Btn className="m-big" icon={I.refresh} onClick={() => { const r = act(wid, E.syncOffline, v.a.id); setMsg({ ok: r.ok, text: r.msg }); }}>I'm back online: sync now</Btn></div>
       )}
       {!v.inAt && !v.pendingSync && (
         <div className="m-card m-clock">
@@ -279,7 +280,7 @@ function Clock({ wid }: { wid: string }) {
           <button className={"chip" + (qr === "good" ? " on" : "")} onClick={() => setQr("good")}>Today's code</button>
           <button className={"chip" + (qr === "old" ? " on" : "")} onClick={() => setQr("old")}>An old code</button>
         </>}
-        <button className={"chip" + (where === "offline" ? " on" : "")} onClick={() => setWhere(where === "offline" ? "here" : "offline")}><Icon d={I.wifiOff} size={14} />No signal</button>
+        <button className={"chip" + (offline ? " on" : "")} aria-pressed={offline} onClick={() => setOffline((x) => !x)}><Icon d={I.wifiOff} size={14} />No signal</button>
       </div>}
     </>
   );

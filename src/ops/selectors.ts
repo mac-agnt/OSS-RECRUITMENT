@@ -206,17 +206,24 @@ export function attendance(s: OpsState, shifts: Shift[]): AttCounts {
   }
   return c;
 }
-/** Which request a confirmed worker still owes a reply to, if any. */
+/** The phone shows travel buttons from three hours before the start; any travel reply since then counts. */
+export const TRAVEL_WINDOW_H = 3;
+export function travelReplied(s: OpsState, a: Assignment): boolean {
+  const sh = shift(s, a.shiftId);
+  const since = ms(sh.start) - Math.max(TRAVEL_WINDOW_H, s.rules.travelH) * 3600e3;
+  return updatesOf(s, a.id).some((u) => TRAVEL_CODES.includes(u.code) && ms(u.at) >= since);
+}
+/** Which request a confirmed worker still owes a reply to, if any. Only people booked when a request went out owe it. */
 export function owedReply(s: OpsState, a: Assignment): "travel" | "reconfirm" | null {
   if (a.status !== "confirmed") return null;
   const sh = shift(s, a.shiftId);
   if (ms(s.clock) >= ms(sh.start)) return null;
   const v = sh.version;
-  if (s.autoRuns.some((r) => r.key === "travel:" + sh.id + ":v" + v)) {
-    const since = ms(sh.start) - s.rules.travelH * 3600e3;
-    return updatesOf(s, a.id).some((u) => TRAVEL_CODES.includes(u.code) && ms(u.at) >= since) ? null : "travel";
-  }
-  if (s.autoRuns.some((r) => r.key === "reconfirm:" + sh.id + ":v" + v)) return a.reconfirmedAt ? null : "reconfirm";
+  const travel = s.autoRuns.find((r) => r.key === "travel:" + sh.id + ":v" + v);
+  if (travel && ms(a.at) <= ms(travel.at)) return travelReplied(s, a) ? null : "travel";
+  if (travel) return null;
+  const rec = s.autoRuns.find((r) => r.key === "reconfirm:" + sh.id + ":v" + v);
+  if (rec && ms(a.at) <= ms(rec.at)) return a.reconfirmedAt ? null : "reconfirm";
   return null;
 }
 
@@ -379,6 +386,8 @@ export function candidates(s: OpsState, shiftId: string, role: string, f: CandFi
     if (!w.roles.includes(role) || conf.has(w.id)) continue;
     if (q && !(w.name.toLowerCase().includes(q) || w.area.toLowerCase().includes(q))) continue;
     if (f.county && w.county !== f.county) continue;
+    // Cheap availability check first: most of the pool is ruled out here before the full eligibility check.
+    if (f.available && availabilityAt(s, w.id, sh.start, sh.end).state !== "available") continue;
     const e = eligibility(s, w.id, shiftId, role);
     if (f.available && e.avail !== "available") continue;
     if (f.validDocs && e.reasons.some((r) => r.code.startsWith("doc:"))) continue;
@@ -396,7 +405,7 @@ export function candidates(s: OpsState, shiftId: string, role: string, f: CandFi
 function hashScore(k: string) { let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0; return h; }
 /** Eligible workers with availability confirmed and no open offer for this shift. */
 export const eligibleAvailable = (s: OpsState, shiftId: string, role: string) =>
-  candidates(s, shiftId, role).filter((c) => (c.e.status === "eligible" || c.e.status === "warning") && c.e.avail === "available" && !c.offered);
+  candidates(s, shiftId, role, { available: true }).filter((c) => (c.e.status === "eligible" || c.e.status === "warning") && !c.offered);
 
 /** Best replacement for an assignment: willing standby first, then the best eligible available worker. */
 export function replacementFor(s: OpsState, asgId: string, exclude?: Set<string>): { workerId: string; from: "standby" | "eligible"; standbyId?: string } | null {
@@ -514,19 +523,44 @@ export function tally(s: OpsState, m: Message) {
   return counts;
 }
 
+/* ── memoised views for screens (recomputed only when the data changes, not on UI-only changes) ── */
+const memoCache = new WeakMap<object, Map<string, { deps: unknown[]; v: unknown }>>();
+function memo<T>(s: OpsState, key: string, fn: () => T): T {
+  const deps = [s.seq, s.clock, s.assignments, s.offers, s.shifts, s.events, s.docs, s.workers, s.exceptions, s.messages, s.standby, s.clocks, s.updates, s.approvals, s.exports, s.autoRuns, s.rules];
+  let m = memoCache.get(s.workers);
+  if (!m) { m = new Map(); memoCache.set(s.workers, m); }
+  const c = m.get(key);
+  if (c && c.deps.every((d, i) => d === deps[i])) return c.v as T;
+  const v = fn();
+  m.set(key, { deps, v });
+  return v;
+}
+
 /* ── today and alerts ───────────────────────────────────────────────────── */
-export function todayStats(s: OpsState) {
+/** Timesheets waiting for the office (rail badge). */
+export const officeQueue = (s: OpsState) => memo(s, "officeQueue", () => lines(s, { status: ["office"] }).length);
+
+/** Today's shifts: those starting today plus any still running from last night. */
+export function todayShifts(s: OpsState): { e: Event; sh: Shift }[] {
+  const day = dayKey(s.clock), now = ms(s.clock);
+  return s.shifts.filter((sh) => (dayKey(sh.start) === day || (ms(sh.start) < now && ms(sh.end) > now)) && event(s, sh.eventId)?.status === "confirmed")
+    .map((sh) => ({ e: event(s, sh.eventId), sh })).sort((a, b) => a.sh.start.localeCompare(b.sh.start) || a.e.name.localeCompare(b.e.name));
+}
+export const todayStats = (s: OpsState) => memo(s, "todayStats", () => {
   const day = dayKey(s.clock);
-  const evs = eventsOnDay(s, day);
-  const shs = evs.flatMap((e) => shiftsOnDay(s, e.id, day));
+  const rows = todayShifts(s);
+  const shs = rows.map((r) => r.sh);
+  const evs = [...new Map(rows.map((r) => [r.e.id, r.e])).values()];
   const c = sumCov(shs.map((x) => coverage(s, x.id)));
   let noReply = 0;
   for (const sh of shs) for (const a of confirmedOf(s, sh.id)) if (a.flaggedAt || owedReply(s, a)) noReply++;
-  const exceptions = s.exceptions.filter((e) => e.status === "open").length;
+  const ids = new Set(shs.flatMap((sh) => confirmedOf(s, sh.id).map((a) => a.id)));
+  const exceptions = s.exceptions.filter((e) => e.status === "open" && ids.has(e.asgId)).length;
   return { day, events: evs, shifts: shs, ...c, noReply, exceptions, compliance: urgentCompliance(s).length };
-}
+});
 /** Rostered workers in the next seven days whose documents block a shift, plus uploads awaiting verification. */
-export function urgentCompliance(s: OpsState) {
+export const urgentCompliance = (s: OpsState) => memo(s, "urgentCompliance", () => computeUrgentCompliance(s));
+function computeUrgentCompliance(s: OpsState) {
   const until = ms(s.clock) + 7 * 864e5;
   const out: { workerId: string; shiftId?: string; reason: string }[] = [];
   const seen = new Set<string>();
@@ -549,13 +583,16 @@ export interface Alert {
 const WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 export const words = (n: number) => (n >= 0 && n < WORDS.length ? WORDS[n] : String(n));
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
-export function alerts(s: OpsState): Alert[] {
+export const alerts = (s: OpsState): Alert[] => memo(s, "alerts", () => computeAlerts(s));
+function computeAlerts(s: OpsState): Alert[] {
   const out: Alert[] = [];
   const now = ms(s.clock);
   const week = now + 7 * 864e5;
   // Attendance today: non-responders, lost and late workers.
-  for (const e of eventsOnDay(s, dayKey(s.clock))) {
-    const shs = shiftsOnDay(s, e.id, dayKey(s.clock)).filter((x) => ms(x.end) > now);
+  const today = todayShifts(s);
+  for (const e of [...new Map(today.map((r) => [r.e.id, r.e])).values()]) {
+    const shs = today.filter((r) => r.e.id === e.id).map((r) => r.sh).filter((x) => ms(x.end) > now);
+    if (!shs.length) continue;
     const flagged = shs.flatMap((x) => confirmedOf(s, x.id).filter((a) => a.flaggedAt));
     if (flagged.length) out.push({ id: "flag-" + e.id, tone: "bad", area: "attendance", eventId: e.id, to: "/events/" + e.id + "?tab=roster",
       title: e.name.split(":")[0] + ": " + words(flagged.length) + (flagged.length === 1 ? " worker has" : " workers have") + " not replied",

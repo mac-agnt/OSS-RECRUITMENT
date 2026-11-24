@@ -101,7 +101,11 @@ export interface Exception {
 
 /* ── hours ──────────────────────────────────────────────────────────────── */
 export interface Approval { id: ID; asgId: ID; stage: "supervisor" | "office"; by: ID; at: string; version: number; reopened?: string }
-export interface PayExport { id: ID; at: string; by: ID; asgIds: ID[]; period: string; minutes: number; amount: number; file: string }
+export interface PayExport {
+  id: ID; at: string; by: ID; asgIds: ID[]; period: string; minutes: number; amount: number; file: string;
+  /** The exact rows sent to payroll, frozen at export so later rate or time changes can't alter them. */
+  rows?: (string | number)[][];
+}
 export interface SyncRun { id: ID; at: string; by: ID; scope: string; rows: number; summary: string }
 
 /* ── messages ───────────────────────────────────────────────────────────── */

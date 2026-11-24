@@ -21,7 +21,18 @@ function load(): OpsState {
   return fresh();
 }
 
+/** Drop data saved by older versions of the demo so it can't fill up storage. */
+function dropOldVersions() {
+  try {
+    for (let i = window.localStorage.length - 1; i >= 0; i--) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith("oss-ops-demo:") && k !== KEY) window.localStorage.removeItem(k);
+    }
+  } catch { /* storage unavailable */ }
+}
+
 let state: OpsState = load();
+if (typeof window !== "undefined") dropOldVersions();
 const listeners = new Set<() => void>();
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let saveError = false;

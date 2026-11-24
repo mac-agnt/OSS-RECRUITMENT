@@ -17,7 +17,7 @@ function WorkerSheet({ asgId, onClose }: { asgId: string; onClose: () => void })
   const s = useOps();
   const sid = s.ui.supervisorId;
   const v = Q.asgView(s, asgId);
-  const [mode, setMode] = useState<"main" | "msg" | "time" | "replace">("main");
+  const [mode, setMode] = useState<"main" | "msg" | "time" | "replace" | "override">("main");
   const [text, setText] = useState("");
   const [kind, setKind] = useState<"in" | "out">(v.inAt ? "out" : "in");
   const [hm, setHm] = useState(fmtTime(s.clock));
@@ -39,7 +39,7 @@ function WorkerSheet({ asgId, onClose }: { asgId: string; onClose: () => void })
           {!v.inAt && v.travel !== "arrived" && <Btn className="m-big" onClick={() => run(act(sid, E.replyCode, v.w.id, v.a.id, "arrived", { via: "supervisor", note: "Marked arrived by supervisor" }))}>Mark arrived</Btn>}
           <Btn className="m-big" icon={I.edit} onClick={() => setMode("time")}>Set a time</Btn>
         </div>
-        {!v.inAt && (sb ? <Btn kind="danger" className="m-big" onClick={() => run(act(sid, E.promoteStandby, sb.id, v.a.id))}>Replace with {Q.worker(s, sb.workerId).name} (standby)</Btn>
+        {!v.inAt && (sb ? <Btn kind="danger" className="m-big" onClick={() => { const r = act(sid, E.promoteStandby, sb.id, v.a.id, note); if (r.ok) onClose(); else if (r.data?.needsReason) setMode("override"); }}>Replace with {Q.worker(s, sb.workerId).name} (standby)</Btn>
           : <Btn kind="danger" className="m-big" onClick={() => setMode("replace")}>Request a replacement</Btn>)}
       </>}
       {mode === "msg" && <>
@@ -52,6 +52,11 @@ function WorkerSheet({ asgId, onClose }: { asgId: string; onClose: () => void })
         <input className="input" placeholder="Audit note: how do you know?" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Audit note" />
         <Btn kind="primary" className="m-big" disabled={note.trim().length < 5} onClick={() => run(act(sid, E.correctClock, v.a.id, kind, hm, note))}>Save with note</Btn>
         <span className="tiny dim">The original record is kept and the office sees your note.</span>
+      </>}
+      {mode === "override" && sb && <>
+        <span className="small">Confirming {Q.worker(s, sb.workerId).name} overrides a working-time or travel rule. Add a reason for the office.</span>
+        <input className="input" placeholder="Reason" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Override reason" />
+        <Btn kind="danger" className="m-big" disabled={note.trim().length < 5} onClick={() => run(act(sid, E.promoteStandby, sb.id, v.a.id, note))}>Confirm with reason</Btn>
       </>}
       {mode === "replace" && <>
         <input className="input" placeholder="Why? For example: not answering, no show" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Reason" />
@@ -68,6 +73,8 @@ function ShiftScreen({ shiftId, onBack }: { shiftId: string; onBack: () => void 
   const [open, setOpen] = useState<string | null>(null);
   const [msg, setMsg] = useState(false);
   const [text, setText] = useState("");
+  const [overrideSb, setOverrideSb] = useState<string | null>(null);
+  const [why, setWhy] = useState("");
   const views = Q.confirmedOf(s, sh.id).map((a) => Q.asgView(s, a.id));
   const c = Q.coverage(s, sh.id);
   const groups: [string, Q.AttState[], Q.Tone][] = [
@@ -108,10 +115,15 @@ function ShiftScreen({ shiftId, onBack }: { shiftId: string; onBack: () => void 
           <div className="m-h">Standby ({standby.length})</div>
           <div className="m-list">{standby.map((b) => (
             <div key={b.id} className="m-item"><div className="grow"><b>{Q.worker(s, b.workerId).name}</b><small>{b.role} · #{b.order}</small></div>
-              {Q.coverage(s, sh.id, b.role).outstanding > 0 && <Btn size="sm" kind="primary" onClick={() => act(sid, E.promoteStandby, b.id)}>Confirm</Btn>}</div>))}</div>
+              {Q.coverage(s, sh.id, b.role).outstanding > 0 && <Btn size="sm" kind="primary" onClick={() => { const r = act(sid, E.promoteStandby, b.id); if (!r.ok && r.data?.needsReason) { setWhy(""); setOverrideSb(b.id); } }}>Confirm</Btn>}</div>))}</div>
         </div>
       )}
       {open && <WorkerSheet asgId={open} onClose={() => setOpen(null)} />}
+      {overrideSb && <Sheet title="Confirm with a reason" onClose={() => setOverrideSb(null)}>
+        <span className="small">This overrides a working-time or travel rule for {Q.worker(s, s.standby.find((b) => b.id === overrideSb)?.workerId || "").name}. The office sees your reason.</span>
+        <input className="input" placeholder="Reason" value={why} onChange={(e) => setWhy(e.target.value)} aria-label="Override reason" />
+        <Btn kind="primary" className="m-big" disabled={why.trim().length < 5} onClick={() => { if (act(sid, E.promoteStandby, overrideSb, undefined, why).ok) setOverrideSb(null); }}>Confirm with reason</Btn>
+      </Sheet>}
       {msg && <Sheet title="Message the crew" onClose={() => setMsg(false)}>
         <span className="small dim">Goes to the {c.confirmed} confirmed crew on this shift, in the app and by WhatsApp (simulated).</span>
         <div className="row wrap">{["Briefing in 10 minutes at the meeting point.", "Gates open in 30 minutes. Positions please.", "Thanks everyone, sign out with me before you leave."].map((t) => <button key={t} className="chip" onClick={() => setText(t)}>{t.split(".")[0]}</button>)}</div>
@@ -144,10 +156,11 @@ function Approvals() {
           {l.status === "missing" || l.status === "review" ? <Btn size="sm" kind="danger" onClick={() => { setTime(l.a.id); setHm(fmtTime(l.sh.end)); setNote(""); }}>Fix</Btn> : <Status tone={l.status === "supervisor" ? "warn" : "info"}>{l.status === "supervisor" ? "Ready" : "In progress"}</Status>}
         </div>))}</div>}
       {time && <Sheet title="Set the missing time" onClose={() => setTime(null)}>
-        <span className="small">{Q.worker(s, Q.asg(s, time).workerId).name}: clock-out</span>
+        <span className="small">{Q.worker(s, Q.asg(s, time).workerId).name}: {Q.okClock(s, time, "in") ? "clock-out" : "clock-in"}</span>
         <input className="input" type="time" value={hm} onChange={(e) => setHm(e.target.value)} aria-label="Clock-out time" />
         <input className="input" placeholder="Audit note: how do you know?" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Audit note" />
         <Btn kind="primary" className="m-big" disabled={note.trim().length < 5} onClick={() => { if (act(sid, E.correctClock, time, Q.okClock(s, time, "in") ? "out" : "in", hm, note).ok) setTime(null); }}>Save with note</Btn>
+        {!Q.okClock(s, time, "in") && <Btn className="m-big" onClick={() => { if (act(sid, E.markNoShow, time, note || "Did not attend").ok) setTime(null); }}>They didn't turn up (no-show)</Btn>}
       </Sheet>}
     </>
   );

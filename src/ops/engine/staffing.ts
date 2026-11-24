@@ -2,11 +2,17 @@
 
 import type { Assignment, DocType, Need, Offer, OpsState, Result, Shift } from "../model";
 import {
-  asg, asgsOfShift, blockers, client, confirmedOf, coverage, eligibility, event, isOpenOffer, need, okClock, offer, offersOfShift,
+  asg, asgsOfShift, asgsOfWorker, blockers, client, confirmedOf, coverage, docState, eligibility, event, isOpenOffer, mandatoryTypes, need, okClock, offer, offersOfShift,
   offersOfWorker, shift, shiftsOf, standbyOf, venue, worker
 } from "../selectors";
-import { addMin, fmtDate, fmtTime, minutesBetween, ms, span, zoned } from "../time";
+import { DOC_LABEL } from "../model";
+import { addDays, addMin, fmtDate, fmtTime, minutesBetween, ms, span, zoned } from "../time";
 import { actorId, actorName, audit, denied, directThread, eventThread, nid, no, offerBody, ok, post, shiftWhen } from "./core";
+
+/** Resolve any open attendance issues on an assignment that is no longer on the roster. */
+function closeExceptions(d: OpsState, asgId: string, note: string) {
+  for (const e of d.exceptions) if (e.asgId === asgId && e.status === "open") { e.status = "resolved"; e.resolvedAt = d.clock; e.note = note; }
+}
 
 /* ── clients and locations ──────────────────────────────────────────────── */
 export interface ClientForm { name: string; contact: string; email: string; phone: string }
@@ -69,7 +75,8 @@ function shiftTimes(f: ShiftForm): { start: string; end: string } | string {
   if (!/^\d{2}:\d{2}$/.test(f.start) || !/^\d{2}:\d{2}$/.test(f.end)) return "Enter start and finish times for \"" + (f.label || "shift") + "\".";
   const start = zoned(f.date, f.start);
   let end = zoned(f.date, f.end);
-  if (ms(end) <= ms(start)) end = addMin(end, 24 * 60);
+  // Overnight shifts finish on the next calendar day (correct across the clock change too).
+  if (ms(end) <= ms(start)) end = zoned(addDays(f.date, 1), f.end);
   const len = minutesBetween(start, end);
   if (len < 60) return "\"" + f.label + "\" must be at least one hour.";
   if (len > 16 * 60) return "\"" + f.label + "\" is longer than 16 hours. Split it into two shifts.";
@@ -108,11 +115,41 @@ export function saveEvent(d: OpsState, f: EventForm): Result {
         if (n < have) return no("\"" + old.label + "\" has " + have + " confirmed " + r.toLowerCase() + (have === 1 ? "" : "s") + ". Remove workers before reducing it to " + n + ".");
       }
     }
+    // Confirmed crew must still be able to work a shift after its times or requirements change.
+    const newTimes = new Map<string, { start: string; end: string }>();
+    f.shifts.forEach((s, i) => { if (s.id) newTimes.set(s.id, times[i]); });
+    const clashes: string[] = [];
+    for (const [sid, t] of newTimes) {
+      const old = shift(d, sid);
+      if (!old) continue;
+      for (const a of confirmedOf(d, sid)) {
+        const w = worker(d, a.workerId);
+        for (const b of asgsOfWorker(d, a.workerId)) {
+          if (b.status !== "confirmed" || b.shiftId === sid) continue;
+          const o = newTimes.get(b.shiftId) || shift(d, b.shiftId);
+          if (ms(o.start) < ms(t.end) && ms(t.start) < ms(o.end)) { clashes.push(w.name + " (also booked " + fmtTime(o.start) + "-" + fmtTime(o.end) + ")"); break; }
+        }
+        const quals = [...new Set([...(d.rules.roleQuals[a.role] || []), ...f.quals])];
+        for (const ty of [...mandatoryTypes(w), ...quals]) {
+          const v = docState(d, w.id, ty, t.end);
+          if (!["valid", "expiring", "not_required"].includes(v.state)) { clashes.push(w.name + " (" + DOC_LABEL[ty].toLowerCase() + " " + (v.state === "missing" ? "not on file" : v.state) + ")"); break; }
+        }
+      }
+    }
+    if (clashes.length) return no("Can't save: confirmed crew couldn't work the changed shift: " + [...new Set(clashes)].slice(0, 4).join(", ") + (clashes.length > 4 ? " and " + (clashes.length - 4) + " more" : "") + ". Remove them first or keep the old times.", { clashes });
     Object.assign(ev, { name: f.name.trim(), clientId: f.clientId, venueId: f.venueId, supervisorId: f.supervisorId, instructions: f.instructions.trim(), ppe: f.ppe, quals: f.quals });
     for (const old of shiftsOf(d, f.id)) if (!f.shifts.find((s) => s.id === old.id)) {
+      // A deleted shift takes its history with it (no confirmed crew can be on it), so nothing points at a missing shift.
+      const gone = new Set(asgsOfShift(d, old.id).map((a) => a.id));
       d.shifts = d.shifts.filter((s) => s.id !== old.id);
-      for (const o of offersOfShift(d, old.id)) if (o.status === "sent") { o.status = "withdrawn"; o.respondedAt = d.clock; }
+      d.assignments = d.assignments.filter((a) => !gone.has(a.id));
+      d.updates = d.updates.filter((u) => !gone.has(u.asgId));
+      d.clocks = d.clocks.filter((c) => !gone.has(c.asgId));
+      d.exceptions = d.exceptions.filter((e) => !gone.has(e.asgId));
+      d.approvals = d.approvals.filter((p) => !gone.has(p.asgId));
+      d.offers = d.offers.filter((o) => o.shiftId !== old.id);
       d.standby = d.standby.filter((b) => b.shiftId !== old.id);
+      audit(d, "shift.deleted", "Deleted " + old.label + " from " + ev.name, { type: "event", id: ev.id });
     }
   } else {
     d.events.push({ id: eventId, name: f.name.trim(), clientId: f.clientId, venueId: f.venueId, supervisorId: f.supervisorId, status: "confirmed",
@@ -151,7 +188,7 @@ export function cancelEvent(d: OpsState, eventId: string, reason: string): Resul
   let offers = 0, crew = new Set<string>();
   for (const sh of shiftsOf(d, eventId)) {
     for (const o of offersOfShift(d, sh.id)) if (o.status === "sent") { o.status = "withdrawn"; o.respondedAt = d.clock; offers++; }
-    for (const a of asgsOfShift(d, sh.id)) if (a.status === "confirmed" && !okClock(d, a.id, "in")) { a.status = "removed"; a.endedAt = d.clock; a.endReason = "Event cancelled: " + reason.trim(); crew.add(a.workerId); }
+    for (const a of asgsOfShift(d, sh.id)) if (a.status === "confirmed" && !okClock(d, a.id, "in")) { a.status = "removed"; a.endedAt = d.clock; a.endReason = "Event cancelled: " + reason.trim(); crew.add(a.workerId); closeExceptions(d, a.id, "Event cancelled"); }
   }
   ev.status = "cancelled"; ev.cancelReason = reason.trim();
   if (crew.size) post(d, { threadId: eventThread(d, eventId).id, kind: "message", to: [...crew], body: ev.name + " has been cancelled (" + reason.trim() + "). You are no longer booked. Sorry for the change." });
@@ -235,6 +272,7 @@ export function respondOffer(d: OpsState, offerId: string, answer: "accept" | "d
   if (o.status === "accepted" && answer === "accept") return ok("Already accepted.");
   if (o.status !== "sent") return no("This offer is " + (o.status === "filled" ? "closed (you're on standby)" : o.status) + ".");
   if (!isOpenOffer(d, o)) return no("This offer expired at " + fmtTime(o.expiresAt) + ".");
+  if (ms(d.clock) >= ms(sh.end)) return no("This shift has already finished.");
   if (answer === "decline") {
     o.status = "declined"; o.respondedAt = d.clock;
     post(d, { threadId: eventThread(d, sh.eventId).id, kind: "reply", to: ["office"], from: { kind: "worker", id: w.id }, code: "declined", body: "Declined the offer" + (note ? ": " + note : "") + ".", ref: { type: "offer", id: o.id } });
@@ -292,6 +330,8 @@ export function removeAssignment(d: OpsState, asgId: string, reason: string): Re
   if (okClock(d, a.id, "in")) return no("Already clocked in. Record a clock-out instead.");
   if (!reason.trim()) return no("Give a reason.");
   a.status = "removed"; a.endedAt = d.clock; a.endReason = reason.trim();
+  closeExceptions(d, a.id, "Removed from the shift");
+  for (const o of d.offers) if (o.replaces === a.id && o.status === "sent") { o.status = "withdrawn"; o.respondedAt = d.clock; o.note = "Original removed; place is open"; }
   const sh = shift(d, a.shiftId);
   post(d, { threadId: directThread(d, a.workerId).id, kind: "message", to: [a.workerId], body: "You've been taken off " + shiftWhen(d, sh) + ". " + reason.trim() });
   audit(d, "assignment.removed", "Removed " + worker(d, a.workerId).name + " from " + shiftWhen(d, sh) + ": " + reason.trim(), { type: "assignment", id: a.id });
@@ -334,9 +374,10 @@ export function removeStandby(d: OpsState, id: string): Result {
 export function moveStandby(d: OpsState, id: string, dir: -1 | 1): Result {
   const b = d.standby.find((z) => z.id === id); if (!b) return no("Not on standby.");
   const list = standbyOf(d, b.shiftId);
+  list.forEach((z, k) => (z.order = k + 1));
   const i = list.findIndex((z) => z.id === id), j = i + dir;
   if (j < 0 || j >= list.length) return no("Already at the " + (dir < 0 ? "top" : "bottom") + ".");
-  const t = list[j].order; list[j].order = b.order; b.order = t;
+  list[i].order = j + 1; list[j].order = i + 1;
   return ok("Order updated.");
 }
 /** Send a replacement offer for a confirmed worker (no reply) or a cancelled one. */
@@ -345,24 +386,29 @@ export function offerReplacement(d: OpsState, asgId: string, workerId: string): 
   return sendOffers(d, a.shiftId, a.role, [workerId], { replaces: asgId, note: "This is a replacement. Please reply quickly." });
 }
 /** Confirm a standby worker straight onto the roster, standing down the worker they replace if still booked. */
-export function promoteStandby(d: OpsState, standbyId: string, replacesAsgId?: string): Result {
+export function promoteStandby(d: OpsState, standbyId: string, replacesAsgId?: string, reason = ""): Result {
   // Supervisors on site can confirm a standby replacement as well as the office.
-  const x = denied(d, "allocate", "confirm a replacement");
-  if (x && denied(d, "supervise", "confirm a replacement")) return x;
+  const x = denied(d, ["allocate", "supervise"], "confirm a replacement"); if (x) return x;
   const b = d.standby.find((z) => z.id === standbyId); if (!b) return no("That worker is no longer on standby.");
   const sh = shift(d, b.shiftId), w = worker(d, b.workerId);
+  if (ms(sh.end) <= ms(d.clock)) return no("This shift is over.");
   const e = eligibility(d, w.id, sh.id, b.role);
   const hard = blockers(e, "hard");
   if (hard.length) return no("Can't confirm " + w.name + ": " + hard[0].label + ".");
+  // Being on standby means they're free, so availability is waived; other soft rules need a recorded reason.
+  const soft = blockers(e, "soft").filter((r) => r.code !== "avail");
+  if (soft.length && reason.trim().length < 5)
+    return no("Confirming " + w.name + " overrides: " + soft.map((r) => r.label).join("; ") + ". Give a reason.", { needsReason: soft.map((r) => r.label) });
   const original = replacesAsgId ? asg(d, replacesAsgId) : undefined;
   const swap = original && original.status === "confirmed" && !okClock(d, original.id, "in");
   if (!swap && coverage(d, sh.id, b.role).outstanding === 0) return no("No open " + b.role.toLowerCase() + " place to fill.");
-  const a = newAssignment(d, sh, w.id, b.role, "replacement", { replaces: swap ? original!.id : replacesAsgId });
+  const a = newAssignment(d, sh, w.id, b.role, "replacement", { replaces: swap ? original!.id : replacesAsgId, override: soft.length ? { reason: reason.trim(), rules: soft.map((r) => r.label) } : undefined });
   if (swap) standDown(d, original!, "Replaced by " + w.name + " from standby", a.id);
   if (replacesAsgId) for (const o of d.offers) if (o.replaces === replacesAsgId && o.status === "sent") { o.status = "withdrawn"; o.respondedAt = d.clock; o.note = "Filled from standby"; }
   post(d, { threadId: directThread(d, w.id).id, kind: "message", to: [w.id], body: "Good news: you've moved up from standby. You're confirmed for " + shiftWhen(d, sh) + "." });
   const c = coverage(d, sh.id, b.role);
-  audit(d, "standby.promoted", actorName(d) + " confirmed " + w.name + " from standby" + (swap ? ", replacing " + worker(d, original!.workerId).name : "") + "; " + c.confirmed + "/" + c.required, { type: "assignment", id: a.id });
+  audit(d, "standby.promoted", actorName(d) + " confirmed " + w.name + " from standby" + (swap ? ", replacing " + worker(d, original!.workerId).name : "") + "; " + c.confirmed + "/" + c.required
+    + (soft.length ? "; override: " + soft.map((r) => r.label).join("; ") + ". Reason: " + reason.trim() : ""), { type: "assignment", id: a.id });
   return ok(w.name + " confirmed from standby.", { asgId: a.id });
 }
 

@@ -7,8 +7,9 @@ import { roll } from "../rand";
 import { buildDocs, buildWorkers, PERSONAS, USERS } from "./people";
 import { CLIENTS, VENUES } from "./places";
 import { buildRosters } from "./events";
+import { sageRow } from "../engine/hours";
 
-export const OPS_VERSION = "ops-v1";
+export const OPS_VERSION = "ops-v2";
 
 export const DEFAULT_RULES: Rules = {
   radiusM: 50, clockOpenMin: 60,
@@ -107,6 +108,7 @@ export function buildSeed(today: string): OpsState {
     const ls = e.asgIds.map((k) => line(s, k.split(":")[0])).filter(Boolean);
     e.minutes = ls.reduce((t, l) => t + l!.payableMin, 0);
     e.amount = Math.round(ls.reduce((t, l) => t + l!.pay, 0) * 100) / 100;
+    e.rows = ls.map((l) => sageRow(s, l!, e.id));
   }
 
   s.audit.push(

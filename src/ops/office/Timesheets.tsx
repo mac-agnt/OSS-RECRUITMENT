@@ -68,8 +68,9 @@ function SageDrawer({ onClose }: { onClose: () => void }) {
   };
   const again = (id: string) => {
     const x = s.exports.find((e) => e.id === id)!;
-    const ls = x.asgIds.map((k) => Q.line(s, k.split(":")[0])).filter((l): l is Q.Line => !!l);
-    downloadCsv(x.file, E.SAGE_HEADER, ls.map((l) => E.sageRow(s, l, x.id)));
+    // The rows frozen at export time, so later rate or time changes never alter a file already sent to payroll.
+    const rows = x.rows || x.asgIds.map((k) => Q.line(s, k.split(":")[0])).filter((l): l is Q.Line => !!l).map((l) => E.sageRow(s, l, x.id));
+    downloadCsv(x.file, E.SAGE_HEADER, rows);
   };
   return (
     <Drawer wide title="Sage payroll export" sub="Approved timesheets become a payroll file. Columns are a sample format to confirm with OSS payroll." onClose={onClose}

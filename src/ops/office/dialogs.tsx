@@ -4,7 +4,7 @@ import { useState } from "react";
 import * as E from "../engine";
 import * as Q from "../selectors";
 import { office, useOps } from "../store";
-import { fmtTime } from "../time";
+import { fmtTime, ms } from "../time";
 import { Btn, Dialog } from "../ui/kit";
 
 export function SetTime({ asgId, onClose }: { asgId: string; onClose: () => void }) {
@@ -13,9 +13,13 @@ export function SetTime({ asgId, onClose }: { asgId: string; onClose: () => void
   const [kind, setKind] = useState<"in" | "out">(v.inAt ? "out" : "in");
   const [hm, setHm] = useState(kind === "out" ? fmtTime(v.sh.end) : fmtTime(v.sh.start));
   const [note, setNote] = useState("");
+  // Someone who never clocked in can be recorded as a no-show instead of being given invented times.
+  const noShow = !v.inAt && ms(s.clock) >= ms(v.sh.start);
   return (
     <Dialog title={"Set " + v.w.name + "'s time"} onClose={onClose}
-      actions={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" disabled={note.trim().length < 5} onClick={() => { if (office(E.correctClock, a.id, kind, hm, note).ok) onClose(); }}>Save with note</Btn></>}>
+      actions={<><Btn onClick={onClose}>Cancel</Btn>
+        {noShow && <Btn kind="danger" onClick={() => { if (office(E.markNoShow, a.id, note.trim() || "Did not attend").ok) onClose(); }}>Record as no-show</Btn>}
+        <Btn kind="primary" disabled={note.trim().length < 5} onClick={() => { if (office(E.correctClock, a.id, kind, hm, note).ok) onClose(); }}>Save with note</Btn></>}>
       <div className="stack g12">
         <div className="row">
           <button className={"chip" + (kind === "in" ? " on" : "")} onClick={() => setKind("in")}>Clock-in</button>
@@ -23,7 +27,7 @@ export function SetTime({ asgId, onClose }: { asgId: string; onClose: () => void
           <input className="input" type="time" value={hm} onChange={(e) => setHm(e.target.value)} aria-label="Time" style={{ width: 130 }} />
         </div>
         <textarea className="textarea" style={{ minHeight: 64 }} placeholder="Audit note: how do you know the time?" value={note} onChange={(e) => setNote(e.target.value)} aria-label="Audit note" />
-        <span className="tiny dim">The original clock records are kept. The timesheet goes back for approval.</span>
+        <span className="tiny dim">The original clock records are kept. The timesheet goes back for approval.{noShow ? " If they didn't turn up, record a no-show: no hours are paid and they come off the roster." : ""}</span>
       </div>
     </Dialog>
   );
