@@ -6,7 +6,8 @@ import { go, Link } from "../router";
 import { useOps } from "../store";
 import { fmtDateLong, fmtTime, hourOf } from "../time";
 import { Btn, I, Icon, Panel } from "../ui/kit";
-import { plural, ShiftBoard } from "./common";
+import { plural } from "./common";
+import EventCards from "./EventCards";
 
 export default function Today() {
   const s = useOps();
@@ -42,10 +43,10 @@ export default function Today() {
         ))}
       </div>
       <div className="today-grid">
-        <Panel title="Today's shifts" meta="Green: fully staffed. Amber: partly staffed. Red: unstaffed or needs attention. Grey: finished." flush
-          right={<Link to="/events?view=day" className="small">Open calendar</Link>}>
-          <ShiftBoard s={s} rows={rows} empty={<div className="empty"><b>No events today</b>Create one from New event.</div>} />
-        </Panel>
+        <section className="today-events">
+          <div className="sec-h"><h2>Today's events</h2><span className="dim small">Open an event, or a single shift line.</span><Link to="/events?view=day" className="small" style={{ marginLeft: "auto" }}>Open calendar</Link></div>
+          <EventCards s={s} rows={rows} empty={<div className="empty"><b>No events today</b>Create one from New event.</div>} />
+        </section>
         <Panel title="Needs attention" meta={alerts.length ? plural(alerts.length, "item") : "All clear"} flush>
           <div className="attn">
             {!alerts.length && <div className="empty"><b>Nothing needs you right now</b>New issues appear here as they happen.</div>}

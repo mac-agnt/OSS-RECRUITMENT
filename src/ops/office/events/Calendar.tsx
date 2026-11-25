@@ -7,7 +7,8 @@ import { go, setQuery, useRoute } from "../../router";
 import { useOps } from "../../store";
 import { addDays, dayKey, fmtDateLong, fmtDay, fmtDayMonth, fmtTime, isoWeekdayOfDay, zoned } from "../../time";
 import { Btn, I, Search, Seg, Select, Tabs } from "../../ui/kit";
-import { dayRows, Page, ShiftBoard } from "../common";
+import { dayRows, Page } from "../common";
+import EventCards from "../EventCards";
 
 type View = "day" | "week" | "month";
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -89,10 +90,8 @@ export default function Calendar() {
       </div>
 
       {view === "day" && (
-        <div className="panel">
-          <ShiftBoard s={s} rows={dayRows(s, date, onDay(date))}
-            empty={<div className="empty"><b>No events on {fmtDay(date)}</b>{filtersOn ? "Try clearing the filters." : "Create one with New event."}</div>} />
-        </div>
+        <EventCards s={s} rows={dayRows(s, date, onDay(date))}
+          empty={<div className="empty"><b>No events on {fmtDay(date)}</b>{filtersOn ? "Try clearing the filters." : "Create one with New event."}</div>} />
       )}
 
       {view === "week" && (
