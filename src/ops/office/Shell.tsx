@@ -171,6 +171,13 @@ export default function Shell() {
         </header>
         <div className="o-scroll" data-scroll>
           <Page />
+          <footer className="portal-bar">
+            <div className="stack"><b>Out on site?</b><span>Open the supervisor portal to see who is attending, travelling, delayed or missing, or the worker app to see what crew see.</span></div>
+            <div className="row wrap">
+              <Btn kind="primary" icon={I.phone} onClick={() => go("/m/supervisor")}>Bring me to the supervisors' portal</Btn>
+              <Btn icon={I.user} onClick={() => go("/m/crew")}>Worker app</Btn>
+            </div>
+          </footer>
         </div>
       </div>
       {s.ui.view !== "office" && <PhoneDock />}

@@ -461,6 +461,16 @@ function CrewHome() {
   const detailAsg = detail ? Q.asg(s, detail) : undefined;
   return (
     <div className={"m-app" + (wa ? " m-wa" : "")}>
+      {tab === "jobs" && !wa && !detailAsg ? (
+        <div className="m-hero">
+          <img src="/brand/ryder-cup.jpg" alt="" onError={(e) => { const i = e.currentTarget; if (!i.src.endsWith(".svg")) i.src = "/brand/ryder-cup-hero.svg"; }} />
+          <div className="m-hero-in">
+            <div className="row"><img src="/brand/oss-logo.png" alt="" width={30} height={30} style={{ borderRadius: 7 }} /><span className="m-hero-tag">OSS Crew</span></div>
+            <h1>Hi {w.name.split(" ")[0]}</h1>
+            <span className="m-hero-sub">Ryder Cup 2027 · Adare Manor, Co. Limerick</span>
+          </div>
+        </div>
+      ) : (
       <div className="m-top">
         {wa ? <span className="avatar" style={{ background: "#fff", color: "#0b6b4f" }}>OSS</span> : <img src="/brand/oss-logo.png" alt="" width={30} height={30} style={{ borderRadius: 7 }} />}
         <div className="stack grow" style={{ gap: 0 }}>
@@ -469,6 +479,7 @@ function CrewHome() {
         </div>
         {tab === "messages" && <Toggle on={s.ui.whatsapp} onChange={(v) => setUi({ whatsapp: v })}><span className="small" style={{ color: wa ? "#fff" : undefined }}>WhatsApp</span></Toggle>}
       </div>
+      )}
       <div className="m-body">
         {detailAsg && tab === "shifts" ? <ShiftDetail a={detailAsg} wid={wid} onBack={() => setDetail(null)} onClock={() => { setDetail(null); setTab("clock"); }} />
           : tab === "jobs" ? <Jobs wid={wid} go={setTab} /> : tab === "shifts" ? <Shifts wid={wid} open={setDetail} /> : tab === "clock" ? <Clock wid={wid} />

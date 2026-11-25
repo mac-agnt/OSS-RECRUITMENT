@@ -1,6 +1,7 @@
 /* Supervisor app: my events, who is travelling, late, arrived, clocked in or
    missing, and the few actions needed on a busy site. */
 
+import MapView from "../ui/MapView";
 import { useMemo, useState } from "react";
 import type { Rtw } from "../model";
 import { ROLES } from "../model";
@@ -92,6 +93,7 @@ function ShiftScreen({ shiftId, onBack }: { shiftId: string; onBack: () => void 
         <div className="m-meta"><span><Icon d={I.events} size={15} />{sh.label}, {fmtDay(dayKey(sh.start))} {span(sh.start, sh.end)}</span><span><Icon d={I.pin} size={15} />{venue.meeting}</span></div>
         <div className="row wrap" style={{ gap: 6 }}>{counts.map(([l, n, t]) => <Status key={l} tone={t} plain>{n} {l.toLowerCase()}</Status>)}</div>
       </div>
+      <div className="m-card"><div className="m-h" style={{ marginBottom: 8 }}>Where everyone is</div><MapView s={s} sh={sh} /></div>
       <div className="m-btns">
         <Btn className="m-big" icon={I.comms} onClick={() => setMsg(true)}>Message crew</Btn>
         <Btn className="m-big" icon={I.refresh} onClick={() => act(sid, E.requestStatus, ev.id, [sh.id])}>Request status</Btn>

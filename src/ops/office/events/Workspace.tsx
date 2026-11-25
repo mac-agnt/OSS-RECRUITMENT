@@ -15,6 +15,7 @@ import Roster from "./Roster";
 import { EventMessages } from "../Comms";
 import { LinesPanel } from "../Timesheets";
 import { ResolveDialog, SetTime } from "../dialogs";
+import MapView from "../../ui/MapView";
 
 type Tab = "overview" | "roster" | "comms" | "attendance" | "timesheets" | "instructions";
 
@@ -87,6 +88,7 @@ export function AttendanceShift({ s, ev, sh }: { s: OpsState; ev: Event; sh: Shi
       <div className="row wrap" style={{ padding: "0 16px 12px" }}>
         {chips.filter(([, n]) => n > 0).map(([l, n, tone]) => <Status key={l} tone={tone} plain>{n} {l.toLowerCase()}</Status>)}
       </div>
+      {ms(sh.start) - ms(s.clock) < 12 * 3600e3 && <div style={{ padding: "0 16px 16px" }}><MapView s={s} sh={sh} /></div>}
       <div className="tbl-wrap" style={{ borderTop: "1px solid var(--border)" }}>
         <table className="tbl" aria-label={"Attendance, " + sh.label}>
           <thead><tr><th>Worker</th><th>Status</th><th className="hide-sm">Last update</th><th>In</th><th>Out</th><th className="hide-md">Issues</th><th /></tr></thead>
