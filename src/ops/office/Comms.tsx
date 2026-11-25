@@ -2,7 +2,7 @@
    messages to one worker, an event crew, selected workers or unconfirmed workers.
    WhatsApp delivery is simulated and labelled. */
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { Code, Message, OpsState } from "../model";
 import { CODE_LABEL } from "../model";
 import * as E from "../engine";
@@ -12,6 +12,7 @@ import { actQuiet, office, useOps } from "../store";
 import { dayKey, fmtDay, fmtTime, ms, relTime, span } from "../time";
 import { Avatar, Btn, Check, Drawer, Field, I, Icon, Notice, Search, Select, Sim, Status, Tabs, Toggle } from "../ui/kit";
 
+const dayLabel = (iso: string, now: string) => (dayKey(iso) === dayKey(now) ? "Today" : dayKey(iso) === dayKey(new Date(ms(now) - 86400e3).toISOString()) ? "Yesterday" : fmtDay(dayKey(iso)));
 const TRAVEL: Code[] = ["on_way", "late", "arrived", "lost", "cant_make"];
 
 export function Bubble({ s, m, wa }: { s: OpsState; m: Message; wa?: boolean }) {
@@ -19,14 +20,14 @@ export function Bubble({ s, m, wa }: { s: OpsState; m: Message; wa?: boolean }) 
   const sys = m.from.kind === "system";
   const t = m.asks ? Q.tally(s, m) : null;
   return (
-    <div className={"bubble" + (fromWorker ? "" : " out")} style={wa ? { background: fromWorker ? "var(--surface)" : "var(--wa-soft)", borderColor: "transparent" } : undefined}>
+    <div className={"bubble" + (fromWorker ? "" : " out")}>
       <div className="who">{sys ? "OSS automatic" : fromWorker ? Q.nameOf(s, m.from.id) : Q.nameOf(s, m.from.id) + (m.from.kind === "supervisor" ? " (supervisor)" : "")}
         {!fromWorker && m.to.length > 1 && <span className="dim" style={{ fontWeight: 400 }}> to {m.to.length} crew</span>}
         {!fromWorker && m.to.length === 1 && m.to[0] !== "office" && <span className="dim" style={{ fontWeight: 400 }}> to {Q.nameOf(s, m.to[0])}</span>}</div>
       <div style={{ color: "var(--ink)", whiteSpace: "pre-wrap" }}>{fromWorker && m.code ? <b>{m.body}</b> : m.body}</div>
       {m.asks && <div className="tally">{m.asks.map((c) => <span key={c} className="tag">{CODE_LABEL[c]}</span>)}</div>}
       {t && <div className="tally">{Object.entries(t).map(([k, n]) => <Status key={k} tone={k === "No reply yet" ? "grey" : k === "Cannot make the shift" || k === "Cannot find the location" ? "bad" : k === "Running late" ? "warn" : "ok"} plain>{n} {k.toLowerCase()}</Status>)}</div>}
-      <div className="meta"><span>{fmtDay(dayKey(m.at))} {fmtTime(m.at)}</span>{m.channels.includes("whatsapp") && <span>WhatsApp (simulated)</span>}{m.channels.includes("app") && <span>In app</span>}{m.kind !== "message" && m.kind !== "reply" && <span>{m.kind}</span>}</div>
+      <div className="meta">{m.channels.includes("whatsapp") && <span>WhatsApp (simulated)</span>}{m.kind !== "message" && m.kind !== "reply" && <span>{m.kind}</span>}<span>{fmtTime(m.at)}{!fromWorker && <span style={{ color: "#53bdeb", marginLeft: 4 }}>✓✓</span>}</span></div>
     </div>
   );
 }
@@ -81,7 +82,6 @@ export function Composer({ eventId, workerId, shiftId, onSent, compact }: { even
 /* ── thread view ────────────────────────────────────────────────────────── */
 function ThreadView({ threadId, workerId, eventId, onBack }: { threadId?: string; workerId?: string; eventId?: string; onBack?: () => void }) {
   const s = useOps();
-  const [wa, setWa] = useState(false);
   const [all, setAll] = useState(false);
   const t = threadId ? Q.threadById(s, threadId) : undefined;
   const wid = workerId || t?.workerId;
@@ -95,7 +95,7 @@ function ThreadView({ threadId, workerId, eventId, onBack }: { threadId?: string
   useEffect(() => { if (t && unread) actQuiet(s.ui.officeId, E.markRead, "office", t.id); }, [t?.id, unread]);
   const title = t?.title || (wid ? Q.worker(s, wid).name : eid ? Q.event(s, eid).name : "");
   return (
-    <div className="thread">
+    <div className="thread wa-skin">
       <div className="thread-h">
         <div className="row">
           {onBack && <Btn kind="quiet" size="sm" icon={I.chevL} iconOnly title="Back to threads" onClick={onBack} />}
@@ -106,16 +106,15 @@ function ThreadView({ threadId, workerId, eventId, onBack }: { threadId?: string
           </div>
         </div>
         <div className="row">
-          <Toggle on={wa} onChange={setWa}><span className="small">WhatsApp view</span></Toggle>
           {wid && <Btn size="sm" onClick={() => go("/crew/" + wid)}>Profile</Btn>}
           {eid && <Btn size="sm" onClick={() => go("/events/" + eid + "?tab=roster")}>Event</Btn>}
         </div>
       </div>
-      <div className="thread-b" style={wa ? { background: "var(--wa-bg)" } : undefined}>
-        {wa && <div className="tiny dim" style={{ alignSelf: "center" }}>Preview of how this thread looks in WhatsApp. Simulated: no WhatsApp account is connected.</div>}
+      <div className="thread-b">
+        <div className="wa-date" style={{ maxWidth: 520, textAlign: "center" }}>Simulated WhatsApp: no WhatsApp account is connected. Messages here are not sent to real phones.</div>
         {!allMsgs.length && <div className="empty"><b>No messages yet</b>Write the first one below.</div>}
         {hidden > 0 && <button className="linkbtn small" style={{ alignSelf: "center" }} onClick={() => setAll((x) => !x)}>{all ? "Hide routine replies" : hidden + " routine replies (confirmed, on my way, arrived) are counted in the tallies. Show them"}</button>}
-        {msgs.map((m) => <Bubble key={m.id} s={s} m={m} wa={wa} />)}
+        {msgs.map((m, i) => <Fragment key={m.id}>{(i === 0 || dayKey(m.at) !== dayKey(msgs[i - 1].at)) && <div className="wa-date">{dayLabel(m.at, s.clock)}</div>}<Bubble s={s} m={m} /></Fragment>)}
       </div>
       <div className="thread-f"><Composer key={(wid || "") + (eid || "")} workerId={wid} eventId={wid ? undefined : eid} compact={!!wid} /></div>
     </div>
@@ -209,14 +208,14 @@ export default function Comms({ threadId }: { threadId?: string }) {
   const openId = threadId || directForWorker;
   const unread = threads.reduce((n, x) => n + x.unread, 0);
   return (
-    <div className={"comms" + (openId ? " has-thread" : "")}>
+    <div className={"comms wa-skin" + (openId ? " has-thread" : "")}>
       <div className="comms-list">
-        <div className="stack g8" style={{ padding: 12, borderBottom: "1px solid var(--border)" }}>
-          <div className="row between"><h2>Messages</h2><Btn size="sm" kind="primary" icon={I.plus} onClick={() => setComposing(true)}>New</Btn></div>
-          <Search value={q} onChange={setQ} placeholder="Search threads" />
-          <div className="row wrap" style={{ gap: 6 }}>
-            {(["all", "unread", "events", "people"] as const).map((f) => <button key={f} className={"chip" + (filter === f ? " on" : "")} style={{ height: 28 }} onClick={() => setFilter(f)}>
-              {f === "all" ? "All" : f === "unread" ? "Unread" + (unread ? " (" + unread + ")" : "") : f === "events" ? "Events" : "People"}</button>)}
+        <div className="wa-list-h">
+          <div className="row between"><h2>Chats</h2><button className="wa-plus" title="New message" aria-label="New message" onClick={() => setComposing(true)}><Icon d={I.plus} size={22} /></button></div>
+          <Search value={q} onChange={setQ} placeholder="Search or start a new chat" />
+          <div className="row wrap" style={{ gap: 8 }}>
+            {(["all", "unread", "events", "people"] as const).map((f) => <button key={f} className={"chip" + (filter === f ? " on" : "")} onClick={() => setFilter(f)}>
+              {f === "all" ? "All" : f === "unread" ? "Unread" + (unread ? " " + unread : "") : f === "events" ? "Groups" : "People"}</button>)}
           </div>
         </div>
         <div className="items">
@@ -226,14 +225,14 @@ export default function Comms({ threadId }: { threadId?: string }) {
               {t.kind === "direct" ? <Avatar name={t.title} /> : <span className="avatar"><Icon d={I.events} size={14} /></span>}
               <span className="stack grow" style={{ gap: 1 }}>
                 <span className="row between"><span className="t ellip">{t.title}{t.kind === "event" && t.eventId && Q.event(s, t.eventId) ? <span className="dim" style={{ fontWeight: 400 }}> · {fmtDay(dayKey(Q.eventSpan(s, t.eventId).start))}</span> : null}</span><span className="tiny dim nowrap">{last ? relTime(last.at, s.clock) : ""}</span></span>
-                <span className="row between"><span className="p">{last ? (last.from.kind === "worker" ? Q.nameOf(s, last.from.id).split(" ")[0] + ": " : "") + (last.code ? CODE_LABEL[last.code] : last.body) : ""}</span>{u > 0 && <span className="count accent">{u}</span>}</span>
+                <span className="row between"><span className="p">{last ? (last.from.kind === "worker" ? Q.nameOf(s, last.from.id).split(" ")[0] + ": " : "✓✓ ") + (last.code ? CODE_LABEL[last.code] : last.body) : ""}</span>{u > 0 && <span className="count accent">{u}</span>}</span>
               </span>
             </button>
           ))}
         </div>
       </div>
       {openId ? <ThreadView key={openId} threadId={s.threads.some((t) => t.id === openId) ? openId : undefined} workerId={workerParam && !threadId ? workerParam : undefined} onBack={() => go("/comms")} />
-        : <div className="thread" style={{ alignItems: "center", justifyContent: "center" }}><div className="empty"><b>Pick a thread</b>Or start a new message to a worker, an event crew or a selection.<div style={{ marginTop: 12 }}><Btn kind="primary" icon={I.plus} onClick={() => setComposing(true)}>New message</Btn></div></div></div>}
+        : <div className="thread wa-skin" style={{ alignItems: "center", justifyContent: "center" }}><div className="empty"><b>Pick a thread</b>Or start a new message to a worker, an event crew or a selection.<div style={{ marginTop: 12 }}><Btn kind="primary" icon={I.plus} onClick={() => setComposing(true)}>New message</Btn></div></div></div>}
       {composing && <NewMessage preset={{ event: eventParam, shift: r.q.get("shift") || undefined }} onClose={() => { setComposing(false); if (r.q.get("new") || eventParam) setQuery({ new: null, event: null, shift: null }); }} />}
     </div>
   );
