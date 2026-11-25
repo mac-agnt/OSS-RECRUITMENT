@@ -8,6 +8,7 @@ import { fmtDateLong, fmtTime, hourOf } from "../time";
 import { Btn, I, Icon, Panel } from "../ui/kit";
 import { plural } from "./common";
 import EventCards from "./EventCards";
+import VenueArt from "../ui/VenueArt";
 
 export default function Today() {
   const s = useOps();
@@ -17,6 +18,7 @@ export default function Today() {
   const h = hourOf(s.clock);
   const greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
   const rows = useMemo(() => Q.todayShifts(s), [s]);
+  const feat = rows.find((r) => Q.staffStatus(s, r.e.id, [r.sh]).tone === "bad") || rows.find((r) => Q.shiftPhase(s, r.sh) !== "done") || rows[0];
   const stats: { n: number; label: string; tone?: "bad" | "warn" | "ok"; to: string }[] = [
     { n: t.events.length, label: "Events today", to: "/events?view=day" },
     { n: t.required, label: "Workers required", to: "/events?view=day" },
@@ -30,9 +32,11 @@ export default function Today() {
     <div className="o-page">
       <FlapClock iso={s.clock} />
       <div className="hero">
+        {feat && <><VenueArt venueId={Q.shiftVenue(s, feat.sh).id} className="hero-art" /><span className="hero-scrim" /></>}
         <span className="hero-pill"><i />{t.events.length} events today · {t.outstanding} open positions</span>
         <h1>{greet} <em>{me.name}</em></h1>
         <p>{fmtDateLong(s.clock)}. {plural(t.events.length, "event")} and {plural(t.shifts.length, "shift")} today.</p>
+        {feat && <span className="hero-feat" onClick={() => go("/events/" + feat.e.id)}><Icon d={I.pin} size={14} />Next up: {feat.e.name} · {Q.shiftVenue(s, feat.sh).name}</span>}
         <div className="row wrap" style={{ justifyContent: "center" }}><Btn icon={I.comms} onClick={() => go("/comms?new=1")}>Message crew</Btn><Btn kind="primary" icon={I.plus} onClick={() => go("/events/new")}>New event</Btn></div>
       </div>
       <div className="strip" role="list" aria-label="Today at a glance">

@@ -1,0 +1,12 @@
+Venue photos from Wikimedia Commons (venue id, file, author, licence):
+V01	File:O2 Dublin frontage, 2009.jpg	William Murphy	CC BY-SA 4.0
+V02	File:Aviva Stadium(Dublin Arena).JPG	Tarafuku10	Public domain
+V03	File:Sports Centre-1140199, Blanchardstown, Dublin 15, Ireland.jpg	Leimanbhradain	CC0
+V04	File:Dublin - Guinness Storehouse - 20160507154420.jpg	Dieglop	CC BY-SA 4.0
+V05	File:The Convention Centre Dublin in 2019.jpg	Metro Centric	CC BY 2.0
+V06	File:Carnival at the RDS, Simmonscourt. - geograph.org.uk - 1884792.jpg	Sarah777 	CC BY-SA 2.0
+V07	File:Bord Gais Theatre, Dublin, Ireland.jpg	David Kernan	CC BY 4.0
+V09	File:Adare Manor IMG 1017.jpg	Michael Costa	CC BY 2.0
+V10	File:View of Adare Manor from Golf Course.jpg	SullyShave	CC BY-SA 4.0
+V12	File:Limerick - Arthur's Quay Park (5771220434).jpg	William Murphy from Dublin, Ireland	CC BY-SA 2.0
+V09, V10, V12 also from Wikimedia Commons (see file history for authors; CC BY / CC BY-SA).

@@ -791,3 +791,15 @@ body { background: #f5f6f8; }
 .ecard-done { position: absolute; right: 16px; bottom: 14px; display: none; }
 .ecard.grey .ecard-hero { filter: saturate(0.6) brightness(0.85); }
 @media (max-width: 760px) { .ecards { grid-template-columns: 1fr; } .eline { grid-template-columns: 92px minmax(0, 1fr) 84px; } .eline-go { display: none; } .ecard-hero { height: 176px; } }
+
+/* Today hero with the featured event's picture behind the greeting */
+.ops .hero { position: relative; overflow: hidden; border-radius: 30px; min-height: 380px; justify-content: center; padding: 56px 24px 44px; margin-bottom: 26px; border: 1px solid var(--border); isolation: isolate; }
+.ops .hero > * { position: relative; z-index: 2; }
+.ops .hero .hero-art { position: absolute; inset: 0; z-index: 0; }
+.ops .hero .hero-art svg, .ops .hero .hero-art img { transform: scale(1.04); filter: saturate(1.05); }
+.ops .hero .hero-scrim { position: absolute; inset: 0; z-index: 1; background: radial-gradient(ellipse at 50% 45%, rgba(8, 12, 17, 0.35) 0%, rgba(8, 12, 17, 0.82) 78%), linear-gradient(180deg, rgba(8, 12, 17, 0.35), rgba(8, 12, 17, 0.9)); }
+.ops .hero h1, .ops .hero p { text-shadow: 0 2px 24px rgba(0, 0, 0, 0.55); }
+.ops .hero p { color: rgba(245, 247, 250, 0.82); }
+.ops .hero-pill { background: rgba(10, 15, 20, 0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.ops .hero-feat { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 7px 14px; border-radius: 999px; background: rgba(10, 15, 20, 0.6); border: 1px solid rgba(255, 255, 255, 0.16); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: #f5f7fa; font-size: 13px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ops .hero-feat:hover { border-color: var(--accent); }
