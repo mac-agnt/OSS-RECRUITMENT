@@ -9,7 +9,7 @@ import { CLIENTS, VENUES } from "./places";
 import { buildRosters } from "./events";
 import { sageRow } from "../engine/hours";
 
-export const OPS_VERSION = "ops-v2";
+export const OPS_VERSION = "ops-v3";
 
 export const DEFAULT_RULES: Rules = {
   radiusM: 50, clockOpenMin: 60,
@@ -36,7 +36,7 @@ export function buildSeed(today: string): OpsState {
     events: [], shifts: [], offers: [], assignments: [], standby: [], updates: [], clocks: [], exceptions: [],
     approvals: [], exports: [], syncs: [], threads: [], messages: [],
     rules: structuredClone(DEFAULT_RULES), autoRuns: [], audit: [],
-    ui: { view: "office", officeId: "U1", supervisorId: "S1", crewId: PERSONAS.ciaran, whatsapp: false, theme: "light", crowd: true }
+    ui: { view: "office", officeId: "U1", supervisorId: "S1", crewId: PERSONAS.ciaran, whatsapp: false, theme: "dark", crowd: true }
   };
   const { hero } = buildRosters(s, today);
 

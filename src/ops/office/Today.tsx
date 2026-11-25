@@ -4,9 +4,9 @@ import { useMemo } from "react";
 import * as Q from "../selectors";
 import { go, Link } from "../router";
 import { useOps } from "../store";
-import { fmtDateLong, hourOf } from "../time";
+import { fmtDateLong, fmtTime, hourOf } from "../time";
 import { Btn, I, Icon, Panel } from "../ui/kit";
-import { Page, plural, ShiftBoard } from "./common";
+import { plural, ShiftBoard } from "./common";
 
 export default function Today() {
   const s = useOps();
@@ -26,8 +26,14 @@ export default function Today() {
     { n: t.compliance, label: "Urgent compliance", tone: t.compliance ? "bad" : "ok", to: "/compliance?tab=attention" }
   ];
   return (
-    <Page title={greet + ", " + me.name} sub={fmtDateLong(s.clock) + ". " + plural(t.events.length, "event") + " and " + plural(t.shifts.length, "shift") + " today."}
-      actions={<><Btn icon={I.comms} onClick={() => go("/comms?new=1")}>Message crew</Btn><Btn kind="primary" icon={I.plus} onClick={() => go("/events/new")}>New event</Btn></>}>
+    <div className="o-page">
+      <FlapClock iso={s.clock} />
+      <div className="hero">
+        <span className="hero-pill"><i />{t.events.length} events today · {t.outstanding} open positions</span>
+        <h1>{greet} <em>{me.name}</em></h1>
+        <p>{fmtDateLong(s.clock)}. {plural(t.events.length, "event")} and {plural(t.shifts.length, "shift")} today.</p>
+        <div className="row wrap" style={{ justifyContent: "center" }}><Btn icon={I.comms} onClick={() => go("/comms?new=1")}>Message crew</Btn><Btn kind="primary" icon={I.plus} onClick={() => go("/events/new")}>New event</Btn></div>
+      </div>
       <div className="strip" role="list" aria-label="Today at a glance">
         {stats.map((x) => (
           <button key={x.label} role="listitem" className={x.tone} onClick={() => go(x.to)}>
@@ -56,6 +62,20 @@ export default function Today() {
           </div>
         </Panel>
       </div>
-    </Page>
+    </div>
+  );
+}
+
+/** Split-flap style date and time, driven by the demo clock. */
+function FlapClock({ iso }: { iso: string }) {
+  const d = fmtDateLong(iso).toUpperCase().replace(/,/g, "").split(" ");
+  const wd = (d[0] || "").slice(0, 3), day = (d[1] || "").padStart(2, "0"), mon = (d[2] || "").slice(0, 3);
+  const tm = fmtTime(iso);
+  const cell = (c: string, k: string, hot?: boolean) => <span key={k} className={"flap" + (hot ? " hot" : "")}>{c}</span>;
+  return (
+    <div className="flaps" role="img" aria-label={"Demo time " + wd + " " + day + " " + mon + " " + tm}>
+      {[...wd].map((c, i) => cell(c, "w" + i))}<span className="flap-gap" />{[...day].map((c, i) => cell(c, "d" + i))}<span className="flap-gap" />{[...mon].map((c, i) => cell(c, "m" + i))}<span className="flap-gap" />
+      {[...tm].map((c, i) => (c === ":" ? <span key={"c" + i} className="flap-colon">:</span> : cell(c, "t" + i, true)))}
+    </div>
   );
 }

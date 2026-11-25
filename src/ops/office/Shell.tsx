@@ -1,7 +1,7 @@
 /* Office shell: side rail with the six areas, top bar (search, role switch, demo
    clock, user), page router and the phone dock for the supervisor and crew apps. */
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { OpsState } from "../model";
 import * as Q from "../selectors";
 import { go, Link, useRoute } from "../router";
@@ -23,11 +23,11 @@ import Settings from "./Settings";
 import PhoneDock from "../phone/PhoneDock";
 
 const NAV = [
-  { id: "today", label: "Today", icon: I.today, to: "/today" },
-  { id: "events", label: "Events", icon: I.events, to: "/events" },
+  { id: "today", sec: "Command", label: "Today", icon: I.today, to: "/today" },
+  { id: "events", sec: "Delivery", label: "Events", icon: I.events, to: "/events" },
   { id: "crew", label: "Crew", icon: I.crew, to: "/crew" },
-  { id: "comms", label: "Communications", icon: I.comms, to: "/comms" },
-  { id: "timesheets", label: "Timesheets", icon: I.hours, to: "/timesheets" },
+  { id: "comms", sec: "Communicate", label: "Communications", icon: I.comms, to: "/comms" },
+  { id: "timesheets", sec: "Pay and risk", label: "Timesheets", icon: I.hours, to: "/timesheets" },
   { id: "compliance", label: "Compliance", icon: I.shield, to: "/compliance" }
 ];
 const TITLES: Record<string, string> = { today: "Today", events: "Events", clients: "Events", crew: "Crew", comms: "Communications", timesheets: "Timesheets", compliance: "Compliance", settings: "Settings" };
@@ -147,12 +147,15 @@ export default function Shell() {
     <div className="o-app">
       {navOpen && <div className="scrim" style={{ zIndex: 64 }} onClick={() => setNavOpen(false)} aria-hidden="true" />}
       <nav className={"o-rail" + (navOpen ? " open" : "")} aria-label="Main">
-        <div className="o-brand"><img src="/brand/oss-logo.png" alt="" /><div><b>OSS Recruitment</b><span>Event staffing</span></div></div>
+        <div className="o-brand"><img src="/brand/oss-logo.png" alt="" /><div><b>OSS Recruitment</b><span>Event staffing · Demo</span></div></div>
         <div className="o-nav">
           {NAV.map((n) => (
-            <Link key={n.id} to={n.to} className={active === n.id ? "on" : ""} aria-current={active === n.id ? "page" : undefined}>
+            <Fragment key={n.id}>
+            {n.sec && <div className="o-sec">{n.sec}</div>}
+            <Link to={n.to} className={active === n.id ? "on" : ""} aria-current={active === n.id ? "page" : undefined}>
               <Icon d={n.icon} size={18} />{n.label}<span className="count-slot" style={{ marginLeft: "auto" }}>{badge[n.id]}</span>
             </Link>
+            </Fragment>
           ))}
         </div>
         <div className="o-rail-foot o-nav">

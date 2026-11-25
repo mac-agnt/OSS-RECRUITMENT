@@ -87,7 +87,35 @@ export function Meter({ value, max, tone }: { value: number; max: number; tone?:
   return <span className={"meter" + (tone ? " " + tone : "")} role="img" aria-label={value + " of " + max}><i style={{ width: pct + "%" }} /></span>;
 }
 export const initials = (name: string) => name.split(/\s+/).map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
-export const Avatar = ({ name, size }: { name: string; size?: "sm" | "lg" }) => <span className={"avatar" + (size ? " " + size : "")} aria-hidden="true">{initials(name)}</span>;
+const SKIN = ["#f3d2b3", "#e9b98f", "#d69f73", "#bb7f53", "#8f5c3b", "#6c432b"];
+const HAIR = ["#1d1511", "#3a291c", "#5f4129", "#8a5a2e", "#c8a24c", "#9a9a9a", "#2a2a33"];
+const SHIRT = ["#2f6f8f", "#c25b4a", "#3f8a5c", "#6a5fb0", "#d19a3a", "#44525f", "#b24a7a", "#2a7f7a"];
+const BACK = ["#d6e4ee", "#ecdfd2", "#d7e8da", "#e3dbef", "#f1e2d3", "#cfdde5"];
+const pick = <T,>(a: T[], n: number) => a[n % a.length];
+/** A drawn profile picture, always the same for the same name. Demo people have no real photos. */
+export function Portrait({ name }: { name: string }) {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) { h ^= name.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  const skin = pick(SKIN, h >>> 3), hair = pick(HAIR, h >>> 7), shirt = pick(SHIRT, h >>> 11), back = pick(BACK, h >>> 15), style = (h >>> 19) % 5;
+  const longHair = style === 1 || style === 2;
+  return (
+    <svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true">
+      <rect width="64" height="64" fill={back} />
+      {longHair && <path d="M18 30c0-14 6-20 14-20s14 6 14 20v22H18z" fill={hair} />}
+      <path d="M8 64c0-13 10-19 24-19s24 6 24 19z" fill={shirt} />
+      <rect x="27" y="38" width="10" height="10" rx="4" fill={skin} />
+      <ellipse cx="32" cy="29" rx="11" ry="12.5" fill={skin} />
+      {style === 0 && <path d="M20.5 27c0-9 5-13 11.500-13s11.500 4 11.500 13c-3-4-7-6-11.500-6s-8.500 2-11.500 6z" fill={hair} />}
+      {style === 1 && <path d="M20 29c0-10 5-15 12-15s12 5 12 15c-4-3-8-8-12-8s-8 5-12 8z" fill={hair} />}
+      {style === 2 && <path d="M20 30c1-11 6-16 12-16s11 5 12 16c-2-6-6-9-12-9s-10 3-12 9z" fill={hair} />}
+      {style === 3 && <><circle cx="32" cy="14" r="5" fill={hair} /><path d="M20.5 27c0-8 5-12 11.500-12s11.500 4 11.500 12c-3-4-7-5-11.500-5s-8.500 1-11.500 5z" fill={hair} /></>}
+      {style === 4 && <path d="M21 25c1-7 5-10 11-10s10 3 11 10c-3-2-7-3-11-3s-8 1-11 3z" fill={hair} opacity="0.9" />}
+      <circle cx="27.500" cy="30" r="1.100" fill="#2b1b12" opacity="0.7" /><circle cx="36.500" cy="30" r="1.100" fill="#2b1b12" opacity="0.7" />
+      <path d="M28.500 35c1.500 1.400 5.500 1.400 7 0" stroke="#7a3f2c" strokeWidth="1.100" fill="none" strokeLinecap="round" opacity="0.7" />
+    </svg>
+  );
+}
+export const Avatar = ({ name, size }: { name: string; size?: "sm" | "lg" }) => <span className={"avatar photo" + (size ? " " + size : "")} aria-hidden="true"><Portrait name={name} /></span>;
 
 /* ── layout ─────────────────────────────────────────────────────────────── */
 export function Panel({ title, meta, right, children, flush, className, id }: { title?: ReactNode; meta?: ReactNode; right?: ReactNode; children: ReactNode; flush?: boolean; className?: string; id?: string }) {
